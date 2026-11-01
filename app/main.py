@@ -6,7 +6,8 @@ from pathlib import Path
 from typing import Literal
 
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from playwright.async_api import Error as PlaywrightError
 
 from app.analyzers.audit_aggregation import (
@@ -18,6 +19,7 @@ from app.analyzers.audit_summary import (
     build_audit_summary,
 )
 from app.analyzers.accessibility import AccessibilityScanStatus
+from app.analyzers.accessibility import NonTextContrastStatus
 from app.analyzers.element_horizontal_overflow import (
     ElementHorizontalOverflowEvidence,
 )
@@ -36,12 +38,33 @@ from app.analyzers.keyboard_focus import (
     KeyboardCheckStatus,
 )
 from app.analyzers.text_reflow import (
+    HOVER_FOCUS_SCENARIO_TIMEOUT_SECONDS,
     SCENARIO_TIMEOUT_SECONDS as TEXT_REFLOW_SCENARIO_TIMEOUT_SECONDS,
     ScenarioClassification,
     ScenarioStatus,
     TextReflowAuditStatus,
 )
 from app.analyzers.accessibility import ACCESSIBILITY_SCAN_TIMEOUT_SECONDS
+from app.analyzers.hybrid_evaluation import (
+    FEATURE_IDS,
+    FEATURE_LABELS,
+    FEATURE_DISCOVERY_TIMEOUT_SECONDS,
+    INITIAL_QUESTIONS,
+    MAX_ANSWERS,
+    MAX_JOURNEYS,
+    MAX_CONTEXT_URLS,
+    QUESTIONNAIRE_QUESTIONS,
+    BrowserCriterionEvidence,
+    OwnerAnswer,
+    WCAG_CRITERION_IDS,
+    build_hybrid_evaluation,
+    sanitize_context_url,
+    validate_owner_text,
+    validate_questionnaire_inputs,
+)
+from app.analyzers.target_size import (
+    AUDIT_TIMEOUT_SECONDS as TARGET_SIZE_AUDIT_TIMEOUT_SECONDS,
+)
 from app.capture.responsive import (
     ElementDiagnosisStatus,
     FindingNormalizationStatus,
@@ -63,9 +86,12 @@ CAPTURE_TIMEOUT_SECONDS = (
         NAVIGATION_TIMEOUT_MS
         + SETTLING_PERIOD_MS
         + MAX_LINK_AUDIT_DURATION_SECONDS * 1_000
-        + ACCESSIBILITY_SCAN_TIMEOUT_SECONDS * 1_000
+        + 2 * ACCESSIBILITY_SCAN_TIMEOUT_SECONDS * 1_000
+        + TARGET_SIZE_AUDIT_TIMEOUT_SECONDS * 1_000
         + KEYBOARD_AUDIT_TIMEOUT_SECONDS * 1_000
-        + 8 * TEXT_REFLOW_SCENARIO_TIMEOUT_SECONDS * 1_000
+        + 17 * TEXT_REFLOW_SCENARIO_TIMEOUT_SECONDS * 1_000
+        + HOVER_FOCUS_SCENARIO_TIMEOUT_SECONDS * 1_000
+        + FEATURE_DISCOVERY_TIMEOUT_SECONDS * 1_000
     )
     / 1_000
     + 15
@@ -90,6 +116,94 @@ capture_service = BrowserCapture(
 
 class CaptureRequest(BaseModel):
     url: str = Field(min_length=1, max_length=4_096)
+    accessibility_context: "AccessibilityContextRequest" = Field(
+        default_factory=lambda: AccessibilityContextRequest()
+    )
+
+
+class OwnerAnswerRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    question_id: str = Field(min_length=1, max_length=100)
+    answer: Literal["yes", "no", "not_sure", "not_applicable"]
+    explanation: str | None = Field(default=None, max_length=2_000)
+    page_urls: list[str] = Field(default_factory=list, max_length=MAX_CONTEXT_URLS)
+
+    @field_validator("explanation")
+    @classmethod
+    def safe_explanation(cls, value: str | None) -> str | None:
+        return validate_owner_text(value)
+
+    @field_validator("page_urls")
+    @classmethod
+    def safe_page_urls(cls, values: list[str]) -> list[str]:
+        return [sanitize_context_url(value) for value in values]
+
+
+class UserJourneyRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1, max_length=120)
+    description: str | None = Field(default=None, max_length=2_000)
+    page_urls: list[str] = Field(default_factory=list, max_length=MAX_CONTEXT_URLS)
+
+    @field_validator("name", "description")
+    @classmethod
+    def safe_journey_text(cls, value: str | None) -> str | None:
+        return validate_owner_text(value)
+
+    @field_validator("page_urls")
+    @classmethod
+    def safe_page_urls(cls, values: list[str]) -> list[str]:
+        return [sanitize_context_url(value) for value in values]
+
+
+class AccessibilityContextRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    representative_page_urls: list[str] = Field(
+        default_factory=list, max_length=MAX_CONTEXT_URLS
+    )
+    user_journeys: list[UserJourneyRequest] = Field(
+        default_factory=list, max_length=MAX_JOURNEYS
+    )
+    feature_presence: dict[str, bool | None] = Field(
+        default_factory=dict, max_length=len(FEATURE_IDS)
+    )
+    feature_inventory_completed: bool = False
+    answers: list[OwnerAnswerRequest] = Field(
+        default_factory=list, max_length=MAX_ANSWERS
+    )
+    free_text: str | None = Field(default=None, max_length=2_000)
+
+    @field_validator("representative_page_urls")
+    @classmethod
+    def safe_representative_urls(cls, values: list[str]) -> list[str]:
+        return [sanitize_context_url(value) for value in values]
+
+    @field_validator("free_text")
+    @classmethod
+    def safe_free_text(cls, value: str | None) -> str | None:
+        return validate_owner_text(value)
+
+    @model_validator(mode="after")
+    def validate_questionnaire(self) -> "AccessibilityContextRequest":
+        validate_questionnaire_inputs(
+            answers=tuple(
+                OwnerAnswer(
+                    question_id=answer.question_id,
+                    answer=answer.answer,
+                    explanation=answer.explanation,
+                    page_urls=tuple(answer.page_urls),
+                )
+                for answer in self.answers
+            ),
+            declared_features=self.feature_presence,
+        )
+        return self
+
+
+CaptureRequest.model_rebuild()
 
 
 class ViewportSchema(BaseModel):
@@ -159,6 +273,28 @@ class AxeRuleSchema(BaseModel):
     failure_summaries: list[str]
 
 
+class NonTextContrastFindingSchema(BaseModel):
+    classification: Literal["needs_review"]
+    potential_issue_detected: Literal[True]
+    confirmed_violation: Literal[False]
+    manual_review_required: Literal[True]
+    selector: str
+    tag_name: str
+    role: str | None
+    geometry: dict[str, float]
+    viewport: dict[str, int]
+    color_pairs: list[dict]
+    limitations: list[str]
+
+
+class NonTextContrastAuditSchema(BaseModel):
+    status: NonTextContrastStatus
+    inspected_components: int
+    inspected_graphics: int
+    findings: list[NonTextContrastFindingSchema]
+    details: list[str]
+
+
 class AccessibilityScanSchema(BaseModel):
     status: AccessibilityScanStatus
     axe_version: str | None
@@ -166,6 +302,7 @@ class AccessibilityScanSchema(BaseModel):
     incomplete: list[AxeRuleSchema]
     passes: list[AxeRuleSchema]
     inapplicable: list[AxeRuleSchema]
+    non_text_contrast: NonTextContrastAuditSchema
     details: list[str]
 
 
@@ -182,6 +319,15 @@ class KeyboardFocusEvidenceSchema(BaseModel):
     obscured: bool | None
     partially_obscured: bool
     occluding_selector: str | None
+    target_rect: dict[str, float]
+    viewport: dict[str, int]
+    occlusion_status: Literal[
+        "confirmed_failure",
+        "potential_issue",
+        "no_issue_detected",
+        "not_evaluated",
+    ]
+    occluding_evidence: list[dict]
     details: list[str]
 
 
@@ -250,6 +396,40 @@ class TextReflowScenarioSchema(BaseModel):
 class TextReflowAuditSchema(BaseModel):
     status: TextReflowAuditStatus
     scenarios: list[TextReflowScenarioSchema]
+    details: list[str]
+
+
+class TargetSizeFindingSchema(BaseModel):
+    criterion_id: Literal["2.5.8"]
+    selector: str
+    tag_name: str
+    role: str | None
+    accessible_name: str | None
+    width_css_px: float
+    height_css_px: float
+    left_css_px: float
+    top_css_px: float
+    classification: Literal["needs_review"]
+
+
+class TargetSizeAuditSchema(BaseModel):
+    status: Literal["available", "partial", "unavailable", "not_tested"]
+    inspected_targets: int
+    findings: list[TargetSizeFindingSchema]
+    details: list[str]
+
+
+class BrowserFeatureEvidenceSchema(BaseModel):
+    feature_id: str
+    detected: bool
+    count: int
+    viewport: str
+    evidence: list[str]
+
+
+class BrowserFeatureDiscoverySchema(BaseModel):
+    status: Literal["available", "partial", "unavailable", "not_attempted"]
+    features: list[BrowserFeatureEvidenceSchema]
     details: list[str]
 
 
@@ -335,6 +515,8 @@ class ResponsiveViewportResponse(BaseModel):
     accessibility_scan: AccessibilityScanSchema
     keyboard_focus_audit: KeyboardFocusAuditSchema
     text_reflow_audit: TextReflowAuditSchema
+    target_size_audit: TargetSizeAuditSchema
+    browser_feature_discovery: BrowserFeatureDiscoverySchema
     finding_normalization: NormalizedFindingsSchema
     screenshot_ref: str | None
     details: list[str]
@@ -343,13 +525,18 @@ class ResponsiveViewportResponse(BaseModel):
 class ResponsiveCaptureResponse(BaseModel):
     requested_url: str
     viewports: list[ResponsiveViewportResponse]
+    hybrid_evaluation: dict
     audit_findings: AuditFindingAggregationSchema
     audit_summary: AuditSummarySchema
 
     @classmethod
     def from_results(
-        cls, requested_url: str, results: list[ViewportCaptureResult]
+        cls,
+        requested_url: str,
+        results: list[ViewportCaptureResult],
+        accessibility_context: AccessibilityContextRequest | None = None,
     ) -> "ResponsiveCaptureResponse":
+        accessibility_context = accessibility_context or AccessibilityContextRequest()
         aggregation = aggregate_audit_findings(
             [
                 finding
@@ -361,8 +548,38 @@ class ResponsiveCaptureResponse(BaseModel):
             ],
         )
         summary = build_audit_summary(aggregation, results)
+        browser_discoveries = tuple(
+            result.browser_feature_discovery for result in results
+        )
+        browser_checks = _browser_criterion_evidence(results)
+        hybrid_evaluation = build_hybrid_evaluation(
+            declared_features=accessibility_context.feature_presence,
+            feature_inventory_completed=(
+                accessibility_context.feature_inventory_completed
+            ),
+            answers=tuple(
+                OwnerAnswer(
+                    question_id=answer.question_id,
+                    answer=answer.answer,
+                    explanation=answer.explanation,
+                    page_urls=tuple(answer.page_urls),
+                )
+                for answer in accessibility_context.answers
+            ),
+            browser_discoveries=browser_discoveries,
+            browser_checks=browser_checks,
+            representative_page_urls=tuple(
+                accessibility_context.representative_page_urls
+            ),
+            journeys=tuple(
+                journey.model_dump()
+                for journey in accessibility_context.user_journeys
+            ),
+            free_text=accessibility_context.free_text,
+        )
         return cls(
             requested_url=requested_url,
+            hybrid_evaluation=hybrid_evaluation,
             audit_summary=AuditSummarySchema(
                 status=summary.status,
                 horizontal_overflow_detected=summary.horizontal_overflow_detected,
@@ -484,6 +701,9 @@ class ResponsiveCaptureResponse(BaseModel):
                             AxeRuleSchema(**asdict(rule))
                             for rule in result.accessibility_scan.inapplicable
                         ],
+                        non_text_contrast=NonTextContrastAuditSchema(
+                            **asdict(result.accessibility_scan.non_text_contrast)
+                        ),
                         details=result.accessibility_scan.details,
                     ),
                     keyboard_focus_audit=KeyboardFocusAuditSchema(
@@ -515,6 +735,29 @@ class ResponsiveCaptureResponse(BaseModel):
                         ],
                         details=result.text_reflow_audit.details,
                     ),
+                    target_size_audit=TargetSizeAuditSchema(
+                        status=result.target_size_audit.status,
+                        inspected_targets=result.target_size_audit.inspected_targets,
+                        findings=[
+                            TargetSizeFindingSchema(**asdict(finding))
+                            for finding in result.target_size_audit.findings
+                        ],
+                        details=result.target_size_audit.details,
+                    ),
+                    browser_feature_discovery=BrowserFeatureDiscoverySchema(
+                        status=result.browser_feature_discovery.status,
+                        features=[
+                            BrowserFeatureEvidenceSchema(
+                                feature_id=feature.feature_id,
+                                detected=feature.detected,
+                                count=feature.count,
+                                viewport=feature.viewport,
+                                evidence=list(feature.evidence),
+                            )
+                            for feature in result.browser_feature_discovery.features
+                        ],
+                        details=list(result.browser_feature_discovery.details),
+                    ),
                     finding_normalization=NormalizedFindingsSchema(
                         status=result.finding_normalization.status,
                         findings=result.finding_normalization.findings,
@@ -526,6 +769,97 @@ class ResponsiveCaptureResponse(BaseModel):
                 for result in results
             ],
         )
+
+
+def _browser_criterion_evidence(
+    results: list[ViewportCaptureResult],
+) -> tuple[BrowserCriterionEvidence, ...]:
+    criterion_tags = {
+        criterion_id: f"wcag{criterion_id.replace('.', '')}"
+        for criterion_id in WCAG_CRITERION_IDS
+    }
+    evidence: list[BrowserCriterionEvidence] = []
+    for result in results:
+        viewport = result.name
+        accessibility = result.accessibility_scan
+        for result_kind in ("violations", "incomplete", "passes", "inapplicable"):
+            for rule in getattr(accessibility, result_kind):
+                matched_criteria = [
+                    criterion_id
+                    for criterion_id, tag in criterion_tags.items()
+                    if tag in rule.tags
+                ]
+                for criterion_id in matched_criteria:
+                    evidence.append(
+                        BrowserCriterionEvidence(
+                            criterion_id=criterion_id,
+                            analyzer_id=f"axe:{rule.rule_id}",
+                            result_status=result_kind,
+                            viewport=viewport,
+                            summary=rule.description,
+                            evidence_count=len(rule.nodes),
+                        )
+                    )
+
+        for check in result.keyboard_focus_audit.checks:
+            if check.status in ("error", "not_tested"):
+                continue
+            for criterion_id in check.criterion_ids:
+                evidence.append(
+                    BrowserCriterionEvidence(
+                        criterion_id=criterion_id,
+                        analyzer_id=f"keyboard_focus:{check.check_id}",
+                        result_status=check.status,
+                        viewport=viewport,
+                        summary=check.summary,
+                        evidence_count=len(check.evidence),
+                    )
+                )
+
+        for scenario in result.text_reflow_audit.scenarios:
+            if scenario.status != "completed":
+                continue
+            for criterion_id in scenario.criterion_ids:
+                evidence.append(
+                    BrowserCriterionEvidence(
+                        criterion_id=criterion_id,
+                        analyzer_id=f"text_reflow:{scenario.scenario_id}",
+                        result_status=scenario.classification,
+                        viewport=viewport,
+                        summary=scenario.condition,
+                        evidence_count=len(scenario.findings),
+                    )
+                )
+
+        if result.accessibility_scan.non_text_contrast.status not in (
+            "not_tested",
+            "unavailable",
+        ):
+            evidence.append(
+                BrowserCriterionEvidence(
+                    criterion_id="1.4.11",
+                    analyzer_id="non_text_contrast",
+                    result_status=result.accessibility_scan.non_text_contrast.status,
+                    viewport=viewport,
+                    summary="Supplemental computed-color sampling; findings require manual review.",
+                    evidence_count=len(
+                        result.accessibility_scan.non_text_contrast.findings
+                    ),
+                )
+            )
+
+        if result.target_size_audit.status not in ("not_tested", "unavailable"):
+            evidence.append(
+                BrowserCriterionEvidence(
+                    criterion_id="2.5.8",
+                    analyzer_id="target_size",
+                    result_status=result.target_size_audit.status,
+                    viewport=viewport,
+                    summary="Measured pointer target dimensions; exceptions and spacing are not fully evaluated.",
+                    evidence_count=len(result.target_size_audit.findings),
+                )
+            )
+    return tuple(evidence)
 
 
 class CaptureErrorResponse(BaseModel):
@@ -594,4 +928,59 @@ async def create_capture(request: CaptureRequest) -> ResponsiveCaptureResponse:
                 detail="Chromium failed while preparing the capture.",
             ).model_dump(),
         ) from error
-    return ResponsiveCaptureResponse.from_results(request.url, results)
+    return ResponsiveCaptureResponse.from_results(
+        request.url,
+        results,
+        accessibility_context=request.accessibility_context,
+    )
+
+
+@app.get("/accessibility/questionnaire")
+async def get_accessibility_questionnaire() -> dict:
+    return {
+        "version": "1.0",
+        "features": [
+            {"feature_id": feature_id, "label": FEATURE_LABELS[feature_id]}
+            for feature_id in FEATURE_IDS
+        ],
+        "feature_inventory_completed_field": "accessibility_context.feature_inventory_completed",
+        "initial_questions": [
+            {
+                "question_id": question.question_id,
+                "criterion_ids": list(question.criterion_ids),
+                "feature_id": question.feature_id,
+                "prompt": question.prompt,
+                "answer_options": list(question.answer_options),
+                "helper_text": question.helper_text,
+            }
+            for question in INITIAL_QUESTIONS
+        ],
+        "conditional_questions": [
+            {
+                "question_id": question.question_id,
+                "criterion_ids": list(question.criterion_ids),
+                "feature_id": question.feature_id,
+                "prompt": question.prompt,
+                "answer_options": list(question.answer_options),
+                "helper_text": question.helper_text,
+            }
+            for question in QUESTIONNAIRE_QUESTIONS
+        ],
+        "safety_notice": (
+            "Do not submit passwords, credentials, personal or customer data, "
+            "access tokens, or secrets. Answers are contextual information and "
+            "are not proof of WCAG conformance."
+        ),
+    }
+
+
+app.mount(
+    "/static",
+    StaticFiles(directory=Path(__file__).resolve().parent / "static"),
+    name="static",
+)
+app.mount(
+    "/",
+    StaticFiles(directory=Path(__file__).resolve().parent / "static", html=True),
+    name="frontend",
+)

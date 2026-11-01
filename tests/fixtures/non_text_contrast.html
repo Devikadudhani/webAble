@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Non-text contrast controls and graphics</title>
+  <style>
+    body { font: 16px sans-serif; background: #fff; padding: 24px; }
+    #low-boundary {
+      padding: 12px;
+      color: #111;
+      background: #f0f0f0;
+      border: 2px solid #aaa;
+    }
+    #high-boundary {
+      padding: 12px;
+      color: #fff;
+      background: #000;
+      border: 2px solid #000;
+    }
+    #hidden-control { display: none; }
+  </style>
+</head>
+<body>
+  <button id="low-boundary">Low contrast component</button>
+  <button id="high-boundary">High contrast component</button>
+  <button id="hidden-control">Hidden control</button>
+  <svg id="low-graphic" width="40" height="40" aria-label="Low contrast graphic">
+    <circle id="low-circle" cx="20" cy="20" r="16" fill="#bbb"></circle>
+  </svg>
+  <svg id="high-graphic" width="40" height="40" aria-label="High contrast graphic">
+    <circle id="high-circle" cx="20" cy="20" r="16" fill="#000"></circle>
+  </svg>
+  <img id="image-graphic" alt="A meaningful illustration" src="/valid.svg">
+  <canvas id="canvas-graphic" width="40" height="40" aria-label="Canvas chart"></canvas>
+</body>
+</html>

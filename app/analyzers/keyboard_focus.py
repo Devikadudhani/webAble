@@ -11,11 +11,11 @@ KeyboardAuditStatus = Literal[
     "available", "partial", "unavailable", "not_tested"
 ]
 
-MAX_TAB_ACTIONS = 20
+MAX_CANDIDATES = 50
+MAX_TAB_ACTIONS = MAX_CANDIDATES + 1
 MAX_SHIFT_TAB_ACTIONS = 2
 ACTION_TIMEOUT_SECONDS = 1
 AUDIT_TIMEOUT_SECONDS = 8
-MAX_CANDIDATES = 50
 
 
 @dataclass(frozen=True)
@@ -32,6 +32,15 @@ class KeyboardFocusEvidence:
     obscured: bool | None
     partially_obscured: bool
     occluding_selector: str | None = None
+    target_rect: dict[str, float] = field(default_factory=dict)
+    viewport: dict[str, int] = field(default_factory=dict)
+    occlusion_status: Literal[
+        "confirmed_failure",
+        "potential_issue",
+        "no_issue_detected",
+        "not_evaluated",
+    ] = "not_evaluated"
+    occluding_evidence: list[dict] = field(default_factory=list)
     details: list[str] = field(default_factory=list)
 
 
@@ -207,16 +216,126 @@ _SNAPSHOT = """(baselineStylesBySelector) => {
     const rect = active.getBoundingClientRect();
     const width = Math.max(0, rect.width);
     const height = Math.max(0, rect.height);
-    const points = [
-      [rect.left + width / 2, rect.top + height / 2],
-      [rect.left + Math.min(2, width / 2), rect.top + Math.min(2, height / 2)],
-      [rect.right - Math.min(2, width / 2), rect.top + Math.min(2, height / 2)],
-      [rect.left + Math.min(2, width / 2), rect.bottom - Math.min(2, height / 2)],
-      [rect.right - Math.min(2, width / 2), rect.bottom - Math.min(2, height / 2)]
-    ].filter(([x, y]) => x >= 0 && y >= 0 &&
-      x < window.innerWidth && y < window.innerHeight);
-    const occluders = points.map(([x, y]) => document.elementFromPoint(x, y))
-      .filter(element => element && element !== active && !active.contains(element));
+    const targetRect = {
+      left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom,
+      width: rect.width, height: rect.height
+    };
+    const viewport = {
+      width: window.innerWidth, height: window.innerHeight
+    };
+    const insideViewport = rect.left >= 0 && rect.top >= 0 &&
+      rect.right <= window.innerWidth && rect.bottom <= window.innerHeight;
+    const ratios = [0.1, 0.3, 0.5, 0.7, 0.9];
+    const points = [];
+    for (const xRatio of ratios) {
+      for (const yRatio of ratios) {
+        const x = rect.left + width * xRatio;
+        const y = rect.top + height * yRatio;
+        if (x >= 0 && y >= 0 && x < window.innerWidth && y < window.innerHeight) {
+          points.push([x, y]);
+        }
+      }
+    }
+    const samples = points.map(([x, y]) => {
+      const hit = document.elementFromPoint(x, y);
+      const covered = Boolean(hit && hit !== active && !active.contains(hit));
+      const chain = [];
+      let node = hit;
+      while (node && node !== document.documentElement) {
+        const style = getComputedStyle(node);
+        const bounds = node.getBoundingClientRect();
+        const layered = style.position === "fixed" || style.position === "sticky" ||
+          style.zIndex !== "auto" || node.matches("dialog:modal");
+        const coversTarget = bounds.left <= rect.left && bounds.top <= rect.top &&
+          bounds.right >= rect.right && bounds.bottom >= rect.bottom;
+        if (layered && coversTarget) chain.push(node);
+        node = node.parentElement;
+      }
+      return {x, y, hit, covered, chain};
+    });
+    const occluders = samples.filter(sample => sample.covered);
+    const occludingElements = new Map();
+    for (const sample of occluders) {
+      const hit = sample.hit;
+      const selector = selectorFor(hit);
+      if (!occludingElements.has(selector)) {
+        const style = getComputedStyle(hit);
+        const bounds = hit.getBoundingClientRect();
+        occludingElements.set(selector, {
+          selector,
+          tagName: hit.tagName.toLowerCase(),
+          role: hit.getAttribute("role"),
+          position: style.position,
+          zIndex: style.zIndex,
+          opacity: style.opacity,
+          backgroundColor: style.backgroundColor,
+          targetHitSamples: 0,
+          rect: {
+            left: bounds.left, top: bounds.top, right: bounds.right,
+            bottom: bounds.bottom, width: bounds.width, height: bounds.height
+          }
+        });
+      }
+      occludingElements.get(selector).targetHitSamples += 1;
+    }
+    const fullCoverCandidates = new Map(
+      samples.length > 0
+        ? samples[0].chain.map(node => [selectorFor(node), node])
+        : []
+    );
+    for (const sample of samples.slice(1)) {
+      const selectors = new Set(sample.chain.map(selectorFor));
+      for (const selector of fullCoverCandidates) {
+        if (!selectors.has(selector)) fullCoverCandidates.delete(selector);
+      }
+    }
+    const coveringElements = [...fullCoverCandidates.values()].map(candidate => {
+      const style = getComputedStyle(candidate);
+      const bounds = candidate.getBoundingClientRect();
+      const color = style.backgroundColor;
+      const alphaMatch = color.match(/rgba?\\([^)]*[,/]\\s*([\\d.]+)\\s*\\)$/);
+      const backgroundAlpha = color.startsWith("rgb(") ? 1 :
+        alphaMatch ? Number(alphaMatch[1]) : 0;
+      let effectiveOpacity = 1;
+      let ancestor = candidate;
+      while (ancestor) {
+        effectiveOpacity *= Number(getComputedStyle(ancestor).opacity);
+        ancestor = ancestor.parentElement;
+      }
+      const candidateSelector = selectorFor(candidate);
+      const hitSamples = samples.filter(sample =>
+        sample.chain.some(node => selectorFor(node) === candidateSelector)
+      ).length;
+      return {
+        selector: candidateSelector,
+        tagName: candidate.tagName.toLowerCase(),
+        role: candidate.getAttribute("role"),
+        position: style.position,
+        zIndex: style.zIndex,
+        opacity: effectiveOpacity,
+        backgroundColor: color,
+        backgroundAlpha,
+        clipPath: style.clipPath,
+        maskImage: style.maskImage,
+        coversTarget: bounds.left <= rect.left && bounds.top <= rect.top &&
+          bounds.right >= rect.right && bounds.bottom >= rect.bottom,
+        targetHitSamples: hitSamples,
+        totalTargetSamples: samples.length,
+        rect: {
+          left: bounds.left, top: bounds.top, right: bounds.right,
+          bottom: bounds.bottom, width: bounds.width, height: bounds.height
+        }
+      };
+    }).filter(Boolean);
+    const opaqueFullCover = coveringElements.find(element =>
+      element.coversTarget &&
+      element.targetHitSamples === samples.length &&
+      element.backgroundAlpha === 1 &&
+      element.opacity === 1 &&
+      element.clipPath === "none" &&
+      element.maskImage === "none"
+    );
+    const allSamplesCovered = points.length > 0 && occluders.length === points.length;
     const styles = indicatorStylesFor(active);
     const candidate = candidates.find(item => item.selector === selectorFor(active));
     const outlineChanged = candidate &&
@@ -249,10 +368,22 @@ _SNAPSHOT = """(baselineStylesBySelector) => {
         focusIndicatorDetected: indicatorDetected,
         focusIndicatorEvidence: styles,
         focusIndicatorUncertain: !indicatorDetected,
-        obscured: points.length > 0 && occluders.length === points.length,
+        obscured: allSamplesCovered,
         partiallyOccluded: occluders.length > 0 && occluders.length < points.length,
         occlusionEvaluated: points.length > 0,
-        occludingSelector: occluders.length ? selectorFor(occluders[0]) : null
+        occludingSelector: occluders.length ? selectorFor(occluders[0].hit) : null,
+        targetRect,
+        viewport,
+        insideViewport,
+        occludingEvidence: [...occludingElements.values()],
+        coveringEvidence: coveringElements,
+        occlusionStatus: opaqueFullCover && insideViewport
+          ? "confirmed_failure"
+          : occluders.length
+            ? "potential_issue"
+            : insideViewport && points.length > 0
+              ? "no_issue_detected"
+              : "not_evaluated"
       }
     };
 }"""
@@ -314,10 +445,16 @@ async def _audit_keyboard_focus(page: KeyboardPage) -> KeyboardFocusAuditResult:
             checks=[
                 _check(
                     "sequential_navigation",
-                    ["2.1.1", "2.1.2", "2.4.3", "2.4.7", "2.4.11"],
+                    ["2.1.1", "2.4.3", "2.4.7", "2.4.11"],
                     "not_tested",
                     str(initial["unsafeReason"]),
-                )
+                ),
+                _check(
+                    "keyboard_trap",
+                    ["2.1.2"],
+                    "not_tested",
+                    str(initial["unsafeReason"]),
+                ),
             ],
             details=[str(initial["unsafeReason"])],
         )
@@ -332,9 +469,15 @@ async def _audit_keyboard_focus(page: KeyboardPage) -> KeyboardFocusAuditResult:
             checks=[
                 _check(
                     "sequential_navigation",
-                    ["2.1.1", "2.1.2", "2.4.3"],
+                    ["2.1.1"],
                     "not_tested",
                     "No visible enabled interactive candidates were found to traverse.",
+                ),
+                _check(
+                    "keyboard_trap",
+                    ["2.1.2"],
+                    "not_tested",
+                    "No visible enabled interactive candidates were found to test for a keyboard trap.",
                 ),
                 _check(
                     "focus_indicator",
@@ -359,10 +502,16 @@ async def _audit_keyboard_focus(page: KeyboardPage) -> KeyboardFocusAuditResult:
             checks=[
                 _check(
                     "sequential_navigation",
-                    ["2.1.1", "2.1.2", "2.4.3", "2.4.7", "2.4.11"],
+                    ["2.1.1", "2.4.3", "2.4.7", "2.4.11"],
                     "not_tested",
                     "Keyboard testing was skipped because network side effects could not be blocked.",
-                )
+                ),
+                _check(
+                    "keyboard_trap",
+                    ["2.1.2"],
+                    "not_tested",
+                    "Keyboard trap testing was skipped because network side effects could not be blocked.",
+                ),
             ],
             details=[
                 "Keyboard testing requires temporary network interception; it was skipped because the page cannot safely isolate requests."
@@ -418,6 +567,7 @@ async def _audit_keyboard_focus(page: KeyboardPage) -> KeyboardFocusAuditResult:
         )
     sequence: list[KeyboardFocusEvidence] = []
     seen: set[str] = set()
+    first_seen_index: dict[str, int] = {}
     late_candidates: list[str] = []
     unexpected_focus_targets: list[str] = []
     tab_actions = 0
@@ -426,6 +576,9 @@ async def _audit_keyboard_focus(page: KeyboardPage) -> KeyboardFocusAuditResult:
     reverse_stuck = False
     reverse_sequence: list[str] = []
     repeated_selector: str | None = None
+    tab_stalled_selector: str | None = None
+    tab_cycle_selectors: list[str] = []
+    tab_action_limit_reached = False
     timeout_detail: str | None = None
     blocked_requests = 0
 
@@ -486,8 +639,16 @@ async def _audit_keyboard_focus(page: KeyboardPage) -> KeyboardFocusAuditResult:
             if selector in seen:
                 repeated_active = True
                 repeated_selector = selector
+                if sequence and sequence[-1].selector == selector:
+                    tab_stalled_selector = selector
+                else:
+                    tab_cycle_selectors = [
+                        item.selector
+                        for item in sequence[first_seen_index[selector]:]
+                    ]
                 break
             seen.add(selector)
+            first_seen_index[selector] = len(sequence)
             outside_snapshot = selector not in by_selector
             if outside_snapshot and selector not in unexpected_focus_targets:
                 unexpected_focus_targets.append(selector)
@@ -524,13 +685,29 @@ async def _audit_keyboard_focus(page: KeyboardPage) -> KeyboardFocusAuditResult:
                     ),
                     partially_obscured=bool(active.get("partiallyOccluded")),
                     occluding_selector=active.get("occludingSelector"),
+                    target_rect=active.get("targetRect", {}),
+                    viewport=active.get("viewport", {}),
+                    occlusion_status=active.get(
+                        "occlusionStatus", "not_evaluated"
+                    ),
+                    occluding_evidence=active.get("coveringEvidence", [])
+                    + active.get("occludingEvidence", []),
                     details=(
-                        ["Focus indicator could not be evaluated reliably."]
-                        if active.get("focusIndicatorUncertain")
-                        else []
+                        (
+                            ["Focus indicator could not be evaluated reliably."]
+                            if active.get("focusIndicatorUncertain")
+                            else []
+                        )
+                        + (
+                            ["Focused target extends outside the viewport; full obscuration cannot be classified."]
+                            if not active.get("insideViewport", False)
+                            else []
+                        )
                     ),
                 )
             )
+        else:
+            tab_action_limit_reached = True
         for _ in range(MAX_SHIFT_TAB_ACTIONS):
             snapshot = await press_and_read("Shift+Tab")
             if snapshot is None:
@@ -579,9 +756,15 @@ async def _audit_keyboard_focus(page: KeyboardPage) -> KeyboardFocusAuditResult:
         checks = [
             _check(
                 "sequential_navigation",
-                ["2.1.1", "2.1.2", "2.4.3"],
+                ["2.1.1"],
                 "error",
                 timeout_detail,
+            ),
+            _check(
+                "keyboard_trap",
+                ["2.1.2"],
+                "error",
+                "Keyboard trap evidence is incomplete because traversal timed out.",
             ),
             _check(
                 "focus_indicator",
@@ -604,10 +787,17 @@ async def _audit_keyboard_focus(page: KeyboardPage) -> KeyboardFocusAuditResult:
         }
         omitted = sorted(expected - seen)
         sequence_status: KeyboardCheckStatus = "needs_review"
-        if repeated_active or reverse_stuck:
+        if tab_stalled_selector:
             sequence_summary = (
-                "The sampled sequence revisited or stalled on a focus target; this may "
-                "reflect normal wrapping, application-managed focus, or a trap."
+                "Tab remained on the same focus target in the sample; this may "
+                "indicate blocked keyboard operation, but does not by itself prove "
+                "a keyboard trap."
+            )
+        elif repeated_active or reverse_stuck:
+            sequence_summary = (
+                "The sampled sequence revisited a focus target; this may reflect "
+                "normal wrapping or application-managed focus and is not by itself "
+                "evidence of a keyboard trap."
             )
         elif (
             omitted
@@ -629,7 +819,7 @@ async def _audit_keyboard_focus(page: KeyboardPage) -> KeyboardFocusAuditResult:
         checks = [
             _check(
                 "sequential_navigation",
-                ["2.1.1", "2.1.2"],
+                ["2.1.1"],
                 sequence_status,
                 sequence_summary,
                 [
@@ -644,6 +834,68 @@ async def _audit_keyboard_focus(page: KeyboardPage) -> KeyboardFocusAuditResult:
                         "shift_tab_sequence": reverse_sequence,
                         "reverse_navigation_stalled": reverse_stuck,
                         "repeated_selector": repeated_selector,
+                        "tab_action_limit_reached": tab_action_limit_reached,
+                    }
+                ],
+            ),
+            _check(
+                "keyboard_trap",
+                ["2.1.2"],
+                "needs_review" if sequence else "not_tested",
+                (
+                    "Focus remained on the same target after both Tab and Shift+Tab; "
+                    "this is a possible keyboard trap and requires review of the "
+                    "containing widget, dismissal method, and applicable exceptions."
+                    if tab_stalled_selector
+                    and reverse_sequence
+                    and reverse_sequence[0] == tab_stalled_selector
+                    else (
+                        "A repeated Tab cycle remained within the same sampled focus "
+                        "targets during reverse navigation; this may be intentional "
+                        "wrapping or a widget-level trap and requires review."
+                        if tab_cycle_selectors
+                        and reverse_sequence
+                        and all(
+                            selector in tab_cycle_selectors
+                            for selector in reverse_sequence
+                        )
+                        else (
+                            "Tab did not advance from a sampled target, but Shift+Tab "
+                            "moved focus; this does not demonstrate a two-direction "
+                            "keyboard trap."
+                            if tab_stalled_selector and reverse_sequence
+                            else (
+                                "No same-target Tab stall or repeated focus cycle "
+                                "persisting during reverse navigation was observed; "
+                                "undiscovered controls, widgets, and states still "
+                                "require review."
+                            )
+                        )
+                    )
+                ),
+                [
+                    {
+                        "tab_stalled_target": tab_stalled_selector,
+                        "repeated_selector": repeated_selector,
+                        "tab_cycle_selectors": tab_cycle_selectors,
+                        "shift_tab_focus_after_stall": (
+                            reverse_sequence[0] if reverse_sequence else None
+                        ),
+                        "shift_tab_progress_observed": (
+                            reverse_sequence[0] != tab_stalled_selector
+                            if tab_stalled_selector and reverse_sequence
+                            else None
+                        ),
+                        "shift_tab_stayed_within_tab_cycle": (
+                            all(
+                                selector in tab_cycle_selectors
+                                for selector in reverse_sequence
+                            )
+                            if tab_cycle_selectors and reverse_sequence
+                            else None
+                        ),
+                        "reverse_navigation_stalled": reverse_stuck,
+                        "candidate_limitations": candidate_limitations,
                     }
                 ],
             ),
@@ -706,15 +958,28 @@ async def _audit_keyboard_focus(page: KeyboardPage) -> KeyboardFocusAuditResult:
             )
         )
 
-        obscured = [item for item in sequence if item.obscured]
         partial = [item for item in sequence if item.obscured is None or item.details]
-        if obscured or any(
-            item.obscured is False and item.occluding_selector for item in sequence
-        ):
-            obscuration_status: KeyboardCheckStatus = "needs_review"
+        confirmed = [
+            item for item in sequence
+            if item.occlusion_status == "confirmed_failure"
+        ]
+        potential = [
+            item for item in sequence
+            if item.occlusion_status == "potential_issue"
+        ]
+        if confirmed:
+            obscuration_status: KeyboardCheckStatus = "fail"
+            obscuration_summary = (
+                "An opaque, layered element covered the full measured bounds of a "
+                "sampled focused component and intercepted all interior hit-test "
+                "samples. This is a high-confidence WCAG 2.4.11 failure candidate."
+            )
+        elif potential:
+            obscuration_status = "needs_review"
             obscuration_summary = (
                 "Hit-testing found an unrelated element over a sampled focused "
-                "component; visual occlusion and criterion applicability need review."
+                "component; full visual obscuration could not be confirmed and "
+                "manual review is required."
             )
         elif sequence and not partial:
             obscuration_status = "needs_review"
@@ -739,6 +1004,10 @@ async def _audit_keyboard_focus(page: KeyboardPage) -> KeyboardFocusAuditResult:
                         "selector": item.selector,
                         "obscured": item.obscured,
                         "occluding_selector": item.occluding_selector,
+                        "target_rect": item.target_rect,
+                        "viewport": item.viewport,
+                        "occlusion_status": item.occlusion_status,
+                        "occluding_evidence": item.occluding_evidence,
                     }
                     for item in sequence
                 ],
@@ -782,10 +1051,11 @@ def _error_result(
     checks = [
         _check(
             "sequential_navigation",
-            ["2.1.1", "2.1.2"],
+            ["2.1.1"],
             "error",
             detail,
         ),
+        _check("keyboard_trap", ["2.1.2"], "error", detail),
         _check("focus_order", ["2.4.3"], "error", detail),
         _check("focus_indicator", ["2.4.7"], "error", detail),
         _check("focus_obscuration", ["2.4.11"], "error", detail),

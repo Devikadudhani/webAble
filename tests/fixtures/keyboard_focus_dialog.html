@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Dialog focus occlusion fixture</title>
+  <style>
+    #cover-dialog {
+      position: fixed;
+      inset: 0;
+      width: auto;
+      height: auto;
+      max-width: none;
+      max-height: none;
+      margin: 0;
+      z-index: 99;
+      border: 0;
+      background: #000;
+    }
+  </style>
+</head>
+<body>
+  <button id="covered" type="button">Covered control</button>
+  <dialog id="cover-dialog" open aria-label="Covering dialog"></dialog>
+</body>
+</html>

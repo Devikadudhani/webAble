@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Orientation-dependent controls</title>
+  <style>
+    body { font: 16px sans-serif; margin: 0; }
+    main { padding: 24px; }
+    #portrait-only { display: none; }
+    #portrait-details { display: none; }
+    #landscape-details { display: block; }
+    @media (orientation: portrait) {
+      #landscape-only { display: none; }
+      #landscape-details { display: none; }
+      #portrait-only { display: inline-block; }
+      #portrait-details { display: block; }
+    }
+    @media (orientation: landscape) {
+      #portrait-only { display: none; }
+      #portrait-details { display: none; }
+      #landscape-only { display: inline-block; }
+      #landscape-details { display: block; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Order status</h1>
+    <p id="order-status">Your order is ready for pickup.</p>
+    <p id="portrait-details">Pickup is available at the north counter.</p>
+    <p id="landscape-details">Pickup is available at the south counter.</p>
+    <button id="portrait-only">Complete pickup</button>
+    <button id="landscape-only">Complete pickup</button>
+  </main>
+</body>
+</html>

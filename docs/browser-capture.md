@@ -85,9 +85,28 @@ they do not discard capture, screenshot, overflow, layout, or functional UX
 results. The full WCAG 2.2 A/AA criterion inventory and limitations are in
 [WCAG 2.2 coverage inventory](./wcag-22-coverage-inventory.md).
 
+The `accessibility_scan.non_text_contrast` object adds a bounded supplemental
+probe for WCAG 1.4.11. It inspects visible native controls, links, selected ARIA
+controls, and SVG shapes for computed solid-color backgrounds, borders,
+outlines, fills, and strokes whose estimated contrast against the adjacent
+solid background is below 3:1. Evidence includes the selector, role, geometry,
+viewport, color pair, measured ratio, and the 3:1 threshold. Findings are
+always `needs_review`; the result is `partial` even when no candidates are
+reported as low contrast.
+
+This probe does not establish which boundary or graphical object is needed to
+identify a component or state, so low ratios are potential issues rather than
+confirmed failures and adequate sampled ratios are not a pass. It does not
+pixel-sample images, canvas, video, gradients, or complex layered/blended
+rendering, and it does not inspect pseudo-element graphics or box shadows;
+those cases need visual review. It can miss custom components or graphical
+objects not in its bounded selector set. axe's `color-contrast`
+rule concerns text contrast and is not by itself coverage of non-text contrast.
+
 Each successful viewport also includes a separate `keyboard_focus_audit`. It
-samples visible interactive candidates with at most 20 `Tab` and 2
-`Shift+Tab` key presses, recording bounded selectors, role/name, focus state,
+samples visible interactive candidates with at most 51 `Tab` and 2
+`Shift+Tab` key presses, matching the 50-candidate discovery bound plus one
+boundary action. It records bounded selectors, role/name, focus state,
 computed-style indicator evidence, and hit-test evidence for possible
 obscuration. It never presses Enter or Space or clicks controls. The audit
 temporarily blocks network requests during key interaction and runs in the
@@ -95,16 +114,34 @@ disposable isolated capture context, which is closed after all audits. Pages can
 opt out with `data-webable-keyboard-audit="unsafe"` on the root element.
 
 Each keyboard check has its own `pass`, `fail`, `needs_review`, `not_tested`,
-or `error` status and remains separate from axe results. The current heuristic
-does not emit `pass` or `fail`: observed sequences and possible style/occlusion
-signals are classified `needs_review`, while absent candidates are
-`not_tested`. This avoids treating a bounded observation as proof of
-conformance or failure. A suspected trap, missing focus style, skipped
-candidate, or possible overlay is sent for review. A sampled Tab order does
+or `error` status and remains separate from axe results. Bounded progression,
+focus-order, and focus-indicator observations remain `needs_review`; absent
+candidates are `not_tested`. A complete opaque full-cover result for criterion
+2.4.11 can be a high-confidence failure candidate, while ambiguous occlusion
+remains review-only. For criterion 2.1.2, a consecutive same-target Tab stall
+is distinguished from a focus sequence that cycles among targets. When a Tab
+stall occurs, the bounded reverse sample records whether Shift+Tab moved focus
+from that target. Neither observation establishes whether the containing
+component can be exited or whether a modal/widget exception and dismissal
+method applies, so keyboard-trap evidence always requires review. Repeated
+multi-target Tab cycles are compared against the sampled reverse sequence and
+reported as possible widget-level trapping when focus remains in that cycle;
+intentional dialog wrapping is not treated as a confirmed failure. This avoids
+treating a bounded observation as proof of conformance or failure. A suspected
+trap, missing focus style, skipped candidate, or possible overlay is sent for
+review. A sampled Tab order does
 not establish correct semantic focus order, keyboard operation of every widget,
 indicator contrast/size, or complete non-obscuration. The hit test samples only
-a few points; computed-style comparison cannot discover every focus indicator
-technique. Focus/blur handlers can have other page-defined effects, so network
+a bounded 5x5 interior grid; computed-style comparison cannot discover every focus indicator
+technique. For WCAG 2.4.11, focused-target evidence includes its measured rectangle,
+viewport dimensions, sampled occluders, and their geometry and computed styles.
+The analyzer reports a high-confidence failure candidate only when a layered,
+opaque element covers the entire in-viewport target and intercepts every grid
+sample. Partial or translucent overlap and other ambiguous cases remain
+`needs_review`; no sampled occlusion is not a pass because the complete visible
+area and all focus states are not evaluated. This check is part of the keyboard
+focus audit and is not a separate duplicate analyzer. Focus/blur handlers can
+have other page-defined effects, so network
 interception and blocking service workers are not a guarantee that arbitrary
 script is side-effect-free.
 
@@ -113,15 +150,29 @@ sequential focus order. Per-scan evidence identifies detected positive
 `tabindex` elements, treats each named radio group as one expected sequential
 tab stop, reports open shadow-root hosts and frames, identifies candidates
 appearing after the initial snapshot, and marks focused targets absent from the
-initial snapshot. These are explicit limitations, not proof that a candidate
-was unreachable. Closed shadow roots, inaccessible frame
+initial snapshot. The 51-action bound covers the 50 discovered candidates and
+one extra boundary action, but the candidate list is still heuristic and may
+be truncated. These are explicit limitations, not proof that a candidate was
+unreachable. Closed shadow roots, inaccessible frame
 contents, and custom widgets may remain undiscovered. Observed elements are
 not treated as complete merely because their count matches the snapshot. Tab
 and Shift+Tab traversal stops on a repeat, the action limit, or an observed
-end; the repeat may represent normal wrapping rather than a trap. The audit's
+end; a repeat among different targets may represent normal wrapping rather
+than a trap and is checked against reverse traversal. The audit's
 outer and per-action timeouts return explicit error or review states;
 cancellation unwinds the temporary route handler and the capture runner closes
 the page, context, and browser in its `finally` cleanup.
+
+Each successfully loaded viewport includes `target_size_audit` for WCAG 2.5.8.
+It measures visible, enabled links and controls (including explicit button/link
+roles) and reports targets narrower or shorter than 24 CSS pixels, with their
+selector, accessible name when available, and measured bounds. These are
+`needs_review` candidates, not confirmed failures: the scan does not evaluate
+the spacing, inline, equivalent-control, user-agent, or essential exceptions,
+and does not discover every custom pointer interaction or determine the full
+effective hit area. Targets meeting the measured dimensions are not proof that
+the criterion passes. Discovery is bounded to 500 targets per viewport, and
+the inventory records this as partial coverage requiring manual review.
 
 The inventory distinguishes existing axe mappings from this WebAble keyboard
 probe. axe-core 4.14.0 has enabled, selected rules tagged to 2.1.1, but none for
@@ -131,8 +182,10 @@ those criteria without replacing contextual evaluation. WCAG 2.2 criterion
 audit does not measure its perimeter-area or contrast requirements.
 
 Each successful viewport also includes `text_reflow_audit` with separately
-identified baseline, 200% text-enlargement, 320 CSS-pixel reflow, and browser
-zoom scenarios. The text scenario temporarily doubles each discovered visible
+identified baseline, WCAG 1.3.4 orientation, 200% text-enlargement, WCAG
+text-spacing, WCAG 1.4.13 hover/focus-content, 320 CSS-pixel reflow, and browser
+zoom scenarios. The text
+scenario temporarily doubles each discovered visible
 text-bearing element's computed font size, measures clipping and new text
 overlaps, optionally captures the suspicious state, and restores inline font
 styles in a cleanup evaluation. All eligible candidates' original computed
@@ -163,10 +216,11 @@ interactive state, and it samples at most 300 text-bearing elements. A
 responsive replacement or missing baseline element is reported for review,
 not treated as proof of lost content. Desktop, tablet, and mobile baseline
 screenshots retain their existing capture behavior. A separate scenario
-screenshot is captured only when the 200% text, 320 CSS-pixel reflow, or
-executed 256 CSS-pixel-height measurement produces findings. Each qualifying
-scenario gets at most one viewport-sized PNG, shared by its scenario and all
-its findings; no image is generated for a clean or untested scenario.
+screenshot is captured only when the 1.3.4 orientation, 200% text, 1.4.13
+hover/focus-content, 320 CSS-pixel reflow, or executed 256 CSS-pixel-height
+measurement produces findings. Each qualifying scenario gets at most one
+viewport-sized PNG, shared by its scenario and all its findings; no image is
+generated for a clean or untested scenario.
 
 The 200% text override remains applied through measurement and optional
 screenshot capture, then is restored in a `finally` path. Scenario
@@ -183,21 +237,117 @@ failed image save does not disable detection. `no_violation_detected` means
 only that these bounded checks did not detect a problem; it is not a
 conformance claim.
 
-For a three-viewport scan, the two always-run probes can add at most six
-scenario screenshots (one text-enlargement and one 320px image per viewport).
+The `text_spacing` scenario extends this analyzer for WCAG 1.4.12. It captures
+baseline measurements, then applies line-height `1.5`, paragraph bottom spacing
+`2em`, letter spacing `0.12em`, and word spacing `0.16em` to up to 300 visible
+text-bearing elements. It compares text geometry and overlap, container
+overflow, visibility, and sampled hit-testing for interactive controls against
+that baseline. Findings include selectors, measured geometry, viewport
+dimensions, relevant baseline/current measurements, and control occluders when
+detected. All findings are `needs_review`: geometry cannot prove actual loss of
+text or functionality. Existing scrollable containers are identified and are
+not automatically treated as failures; spacing-induced changes within them
+remain review evidence. Original inline values and priorities for all four CSS
+properties are restored in a `finally` path, including after measurement or
+screenshot errors. This is a deterministic CSS override, not native browser
+text-spacing or zoom behavior, and custom controls, pseudo-element text, canvas,
+images of text, dynamic states, and content beyond the candidate limit may not
+be covered.
+
+The `orientation` scenario extends this analyzer for WCAG 1.3.4. It resizes the
+live CSS viewport to paired portrait and landscape dimensions, waits for the
+layout to settle, and compares up to 300 visible text-bearing elements and
+controls by selector and opaque content signature. Findings include both
+viewport dimensions, per-orientation visibility and geometry, and whether the
+content signature changed. A disappearing element or changed signature is
+`needs_review`, not a confirmed failure: the probe cannot judge whether
+replacement content is equivalent or whether an orientation restriction is
+essential. Elements outside the viewport but still in normal document flow are
+not treated as missing merely because scrolling is needed.
+
+This is a CSS viewport/responsive-layout test, not physical device rotation. It
+does not emulate orientation sensors, every native `orientationchange` event,
+or all dynamic application states. Images without text alternatives, canvas
+content without an accessible label, pseudo-element content, and content past
+the candidate limit are not fully assessed. The captured viewport is restored
+in a `finally` path, including when measurement or screenshot capture fails.
+The inventory records criterion 1.3.4 as partial and retains manual review.
+
+The `hover_focus_content` scenario extends this analyzer for WCAG 1.4.13. It
+samples up to four visible likely triggers (links, controls, titled or
+ARIA-described elements, and common tooltip/data-toggle hooks) without
+activating them. For each candidate it compares bounded visible-DOM snapshots
+before and after pointer hover and focus, then records newly revealed content,
+trigger/content selectors and geometry, viewport dimensions, role, position,
+z-index, and an opaque text signature. It samples whether pointer entry keeps
+hover content visible, whether Escape dismisses it, whether focus-revealed
+content remains after blur, and whether the content rectangle overlaps other
+text or controls. One viewport-sized screenshot is captured while the first
+revealed state is still visible when screenshot storage is available.
+
+Every discovered reveal is `needs_review`, not a confirmed WCAG failure:
+rectangle intersections do not prove that content is obscured, and automation
+cannot determine applicability, equivalent information, or all exceptions.
+When no reveal is detected, `no_violation_detected` applies only to the sampled
+states, not to the criterion as a whole. Candidate discovery is bounded;
+custom JavaScript triggers outside the selector set, CSS pseudo-elements,
+native browser tooltips, delayed content, and states requiring activation are
+not reliably detected. Escape behavior and focus/hover persistence are sampled
+once and do not exhaustively cover browser or assistive-technology behavior.
+The pointer is moved outside the page and the original focused element is
+restored in cleanup where possible; no control is clicked or activated.
+
+For a three-viewport scan, the five always-run probes can add at most fifteen
+scenario screenshots (one orientation, one text-enlargement, one text-spacing,
+one 1.4.13 hover/focus, and one 320px image per viewport).
 The conditional 256px-height probe can add at most three more, only where it
 was actually run and produced findings. Pages without suspicious findings
 add none. The 18 existing local PNGs measured for this change averaged 187,456
-bytes (~183 KiB); at that observed average, six additional images are about
-1.12 MB and the nine-image upper bound is about 1.69 MB. These are estimates,
+bytes (~183 KiB); at that observed average, fifteen additional images are about
+2.81 MB and the eighteen-image upper bound is about 3.37 MB. These are estimates,
 not a guaranteed image size. Each screenshot adds one viewport-sized PNG
-capture and storage write. Each measured scenario also waits for two animation
-frames after applying its override or viewport change, whether or not a
-screenshot is ultimately needed: nominally about 33 ms per scenario at 60 Hz,
-or about 200 ms for the six unconditional probes and 300 ms if all three
-conditional height probes also run. These are frame-rate estimates, not
-measured wall-clock guarantees. No extra browser navigation or full-page
-rendering is performed.
+capture and storage write. Existing geometry scenarios wait for two animation
+frames after applying their override or viewport change; the interaction probe
+also performs bounded pointer, focus, and Escape actions with settling waits,
+and orientation checks wait for the viewport layout to settle in each
+orientation, so added runtime depends on the number of interactions and
+orientation transitions. These are not measured wall-clock guarantees. No
+extra browser navigation or full-page rendering is performed.
+
+Orientation fixtures validate the 1.3.4 scenario:
+
+| Fixture | Observable result | Expected classification |
+|---|---|---|
+| [orientation_flexible.html](../tests/fixtures/orientation_flexible.html) | Responsive layout changes between portrait and landscape while sampled text and controls remain present. | `no_violation_detected` for the bounded comparison only. |
+| [orientation_restricted.html](../tests/fixtures/orientation_restricted.html) | Orientation-specific CSS hides a control in each orientation and presents separate controls. | `needs_review`; equivalence and whether the restriction is essential require human evaluation. |
+
+Hover/focus fixtures validate the 1.4.13 scenario independently:
+
+| Fixture | Observable result | Expected classification |
+|---|---|---|
+| [hover_focus_compliant.html](../tests/fixtures/hover_focus_compliant.html) | A tooltip is revealed on hover and focus, remains visible when the pointer enters it, and can be dismissed with Escape. | `needs_review` with observed behavior; manual review is still required. |
+| [hover_focus_not_hoverable.html](../tests/fixtures/hover_focus_not_hoverable.html) | A tooltip with `pointer-events: none` disappears when the pointer leaves its trigger. | `needs_review`; pointer-entry behavior is evidence, not a standalone conformance conclusion. |
+| [hover_focus_undismissable.html](../tests/fixtures/hover_focus_undismissable.html) | Focus reveals a fixed dialog-like panel overlapping underlying content; Escape does not dismiss it. | `needs_review`; overlap is geometric and must be confirmed by a reviewer. |
+| [hover_focus_style_only.html](../tests/fixtures/hover_focus_style_only.html) | Hover and focus change button styling without revealing additional DOM content. | `no_violation_detected` for the bounded sampled states only. |
+
+Non-text contrast fixtures exercise the supplemental `accessibility_scan` probe:
+
+| Fixture | Observable result | Expected classification |
+|---|---|---|
+| [non_text_contrast.html](../tests/fixtures/non_text_contrast.html) | Includes a low-contrast CSS button boundary/fill and SVG shape, high-contrast counterparts, a hidden control, plus an image and canvas that are not pixel-sampled. | Low solid-color candidates are `needs_review`; high-contrast and hidden controls are not reported as low contrast. Image/canvas remain for manual review. |
+| [non_text_contrast_adequate.html](../tests/fixtures/non_text_contrast_adequate.html) | A high-contrast CSS control and SVG shape are sampled. | No low-ratio candidates for these samples; overall result remains `partial`, not a pass. |
+
+Text-spacing fixtures validate the `text_spacing` scenario independently of
+the 200% resize and 320 CSS-pixel reflow scenarios:
+
+| Fixture | Observable result | Expected classification |
+|---|---|---|
+| [text_spacing_usable.html](../tests/fixtures/text_spacing_usable.html) | Flexible paragraphs and a control remain within their containers under the prescribed overrides. | `no_violation_detected` for the bounded probe. |
+| [text_spacing_clipped.html](../tests/fixtures/text_spacing_clipped.html) | A two-line paragraph in a fixed-height clipped box overflows after line height grows. | `needs_review`; actual text loss is not inferred. |
+| [text_spacing_overlap.html](../tests/fixtures/text_spacing_overlap.html) | Absolute-positioned text blocks gain rectangle overlap after line-height changes. | `needs_review`; rectangle intersection is not proof of obscured content. |
+| [text_spacing_control.html](../tests/fixtures/text_spacing_control.html) | A fixed-height button label clips after line height changes. | `needs_review`; keyboard and assistive-technology operation are not inferred. |
+| [text_spacing_obscured_control.html](../tests/fixtures/text_spacing_obscured_control.html) | Paragraph spacing shifts a button beneath a fixed overlay, increasing intercepted interior hit-test samples. | `needs_review`; the interaction impact requires human review. |
+| [text_spacing_scrollable.html](../tests/fixtures/text_spacing_scrollable.html) | A long inline text string grows inside a horizontal scroll container. | `needs_review`, not a confirmed failure; the scroll container is explicitly identified. |
 
 The checked-in text-reflow fixtures have these observed behaviors and test
 expectations:
@@ -256,3 +406,107 @@ Evidence intentionally excludes HTML documents, response bodies, cookies, and
 headers. URL fragments and embedded URL credentials are removed from recorded URLs,
 and common credential-like query parameter values are redacted. Other query values
 are preserved because they may be required to reproduce the requested page.
+
+## Hybrid accessibility evaluation foundation
+
+The browser UI is served from the same API origin at `/` (for example,
+`http://localhost:8000/` after starting the server). It is an integrated view of
+the capture workflow, not a separate questionnaire submission path. Users enter
+the audit URL, representative public URLs, journey descriptions, feature
+presence, and optional context before starting the capture. Relevant follow-up
+questions appear immediately for owner-selected features and are updated after
+the browser returns feature discoveries. Answer values and explanations stay
+in page state and are resubmitted with each audit update; answered follow-ups
+are not shown again as pending questions, while their owner-reported evidence
+remains visible in the results.
+
+The UI presents owner-reported information and browser-observed information in
+separate panels with a compact criterion evidence summary instead of 55 outcome
+cards. Browser findings are labeled as evidence rather than criterion
+conclusions. Conflicts between an owner-declared absent feature and a browser
+candidate are shown for review and trigger a discovery follow-up even if an
+owner answered a related criterion question negatively. Owner statements are
+unverified context, never proof of compliance. Criteria requiring further
+evaluation are never presented as WCAG failures or passes. The UI does not
+request passwords and explains that protected pages require a separately
+authorized review; the current capture flow does not support entering
+credentials for protected pages.
+
+`GET /accessibility/questionnaire` returns the initial scope questions, supported
+feature identifiers, and a privacy notice. `POST /captures` accepts an optional
+`accessibility_context` object alongside the URL:
+
+- `representative_page_urls` identifies pages owners consider representative;
+- `user_journeys` records task names, descriptions, and relevant public page URLs;
+- `feature_presence` records owner-declared feature presence (`true`, `false`, or
+  `null` for unknown);
+- `answers` stores structured answers by questionnaire question ID and may
+  associate answers with public page URLs;
+- `free_text` is an optional, bounded context field.
+
+Example request context:
+
+```json
+{
+  "representative_page_urls": ["https://example.org/contact"],
+  "user_journeys": [
+    {
+      "name": "Submit a contact form",
+      "page_urls": ["https://example.org/contact"]
+    }
+  ],
+  "feature_presence": {"forms": true, "authentication": false},
+  "feature_inventory_completed": true,
+  "answers": [
+    {
+      "question_id": "forms.error_identification",
+      "answer": "not_sure",
+      "page_urls": ["https://example.org/contact"]
+    }
+  ]
+}
+```
+
+Only public absolute HTTP(S) context URLs without credentials, query strings, or
+fragments are accepted. Text fields are bounded, reject common credential/email
+patterns, and explicitly instruct users not to submit passwords, credentials,
+personal or customer data, access tokens, or secrets. These checks are safeguards,
+not a guarantee that every sensitive value can be detected. Do not use ordinary
+questionnaire fields for credentials or personal data.
+
+Questionnaire follow-ups are conditional on owner-declared features and read-only
+browser feature discovery. All 55 criteria map to questions, with criterion-
+specific prompts for the 26 manual-evaluation criteria. Questions accept Yes,
+No, Not sure, or Not applicable, with optional explanation and public page URLs.
+The browser probe looks for a bounded set of candidates
+such as forms, password inputs, media, CSS animations, custom roles, language
+attributes, and images/graphics. It is intentionally a feature router: presence
+does not prove a WCAG failure, and absence does not prove a feature is absent.
+If browser evidence finds a feature the owner declared absent, the hybrid report
+records a conflict and returns the relevant questions for follow-up. Discovery is
+limited to 1,000 candidates per selector and reports partial coverage when
+truncated. Representative URLs and journeys are recorded as context; this
+foundation does not automatically crawl those additional pages or execute the
+described journeys.
+
+The response includes `hybrid_evaluation.criteria`, a criterion-indexed collection
+with separate `owner_reported` and `browser_observed` evidence.
+The initial adapter carries exact-tagged axe rule outcomes, keyboard/focus checks,
+text/reflow scenarios, non-text contrast and target-size probes, plus feature
+discovery observations. Each item retains its analyzer, viewport, and bounded
+summary/count; a rule association or empty finding set is not a criterion-level
+pass. Additional analyzers can add criterion-indexed evidence through the same
+source model without defining a separate questionnaire.
+Statuses distinguish `owner_reported`, `browser_observed`,
+`manual_review_needed`, and `not_evaluated`. Contradictory
+feature declarations are surfaced in `conflicts`; neither source silently
+overwrites the other. `compliance_conclusion` remains unset, owner answers carry
+`verified: false`, and criteria without evidence are `not_evaluated`, never
+implicitly passed.
+
+The capture API is currently stateless: questionnaire answers are scoped to the
+request/response and are not durably stored across audits. Deployments should add
+authenticated, access-controlled persistence and an explicit retention policy
+before retaining owner context. The questionnaire maps contextual questions to
+all criteria but is not a substitute for human, assistive-technology, and content
+review.

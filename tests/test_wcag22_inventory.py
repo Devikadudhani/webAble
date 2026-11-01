@@ -72,12 +72,14 @@ def test_inventory_matches_source_and_installed_axe_metadata():
     assert inventory == expected
     assert inventory["scanner_configuration"]["run_only_tags"] == list(WCAG_AA_TAGS)
     assert inventory["summary"]["criterion_count"] == 55
+    assert inventory["summary"]["criteria_with_questionnaire_mapping"] == 55
+    assert inventory["summary"]["manual_criteria_with_questionnaire_mapping"] == 26
     assert inventory["summary"]["mapped_criteria_with_enabled_selected_rules"] == 20
     assert inventory["summary"]["classification_counts"] == {
         "automated": 0,
-        "partial": 25,
+        "partial": 29,
         "manual_evaluation_required": 26,
-        "not_implemented": 4,
+        "not_implemented": 0,
     }
     assert inventory["scope_exclusions"] == source["scope_exclusions"]
 
@@ -94,10 +96,30 @@ def test_inventory_matches_source_and_installed_axe_metadata():
         assert criterion["text_reflow_check_exists"] == bool(
             criterion["text_reflow_checks"]
         )
+        assert criterion["text_spacing_check_exists"] == bool(
+            criterion["text_spacing_checks"]
+        )
+        assert criterion["orientation_check_exists"] == bool(
+            criterion["orientation_checks"]
+        )
+        assert criterion["non_text_contrast_check_exists"] == bool(
+            criterion["non_text_contrast_checks"]
+        )
+        assert criterion["hover_focus_content_check_exists"] == bool(
+            criterion["hover_focus_content_checks"]
+        )
+        assert criterion["target_size_check_exists"] == bool(
+            criterion["target_size_checks"]
+        )
         assert criterion["automated_check_exists"] == (
             criterion["axe_check_exists"]
             or criterion["keyboard_focus_check_exists"]
             or criterion["text_reflow_check_exists"]
+            or criterion["text_spacing_check_exists"]
+            or criterion["orientation_check_exists"]
+            or criterion["non_text_contrast_check_exists"]
+            or criterion["hover_focus_content_check_exists"]
+            or criterion["target_size_check_exists"]
         )
         if criterion["automated_check_exists"]:
             effective_mappings += 1
@@ -125,7 +147,7 @@ def test_inventory_matches_source_and_installed_axe_metadata():
         assert isinstance(criterion["interaction_testing_needed"], bool)
         assert isinstance(criterion["assistive_technology_testing_needed"], bool)
 
-    assert effective_mappings == 25
+    assert effective_mappings == 29
     criteria_by_id = {item["id"]: item for item in inventory["criteria"]}
     for criterion_id in ("2.1.1", "2.1.2", "2.4.3", "2.4.7", "2.4.11"):
         assert criteria_by_id[criterion_id]["keyboard_focus_check_exists"]
@@ -133,6 +155,18 @@ def test_inventory_matches_source_and_installed_axe_metadata():
     for criterion_id in ("1.4.4", "1.4.10"):
         assert criteria_by_id[criterion_id]["text_reflow_check_exists"]
         assert criteria_by_id[criterion_id]["coverage_classification"] == "partial"
+    assert criteria_by_id["2.5.8"]["target_size_check_exists"]
+    assert criteria_by_id["2.5.8"]["coverage_classification"] == "partial"
+    assert criteria_by_id["1.4.12"]["text_spacing_check_exists"]
+    assert criteria_by_id["1.4.12"]["coverage_classification"] == "partial"
+    assert criteria_by_id["1.4.13"]["hover_focus_content_check_exists"]
+    assert criteria_by_id["1.4.13"]["coverage_classification"] == "partial"
+    assert criteria_by_id["1.3.4"]["orientation_check_exists"]
+    assert criteria_by_id["1.3.4"]["coverage_classification"] == "partial"
+    assert criteria_by_id["1.3.4"]["axe_check_exists"] is False
+    assert criteria_by_id["1.4.11"]["non_text_contrast_check_exists"]
+    assert criteria_by_id["1.4.11"]["coverage_classification"] == "partial"
+    assert criteria_by_id["1.4.11"]["axe_check_exists"] is False
 
 
 def test_inventory_rule_references_and_failure_patterns_are_real():
@@ -193,6 +227,26 @@ def test_markdown_and_json_inventory_agree_on_criterion_fields():
         assert (
             f"- **WebAble text/reflow check exists:** "
             f"{str(criterion['text_reflow_check_exists']).lower()}"
+        ) in markdown
+        assert (
+            f"- **WebAble text-spacing check exists:** "
+            f"{str(criterion['text_spacing_check_exists']).lower()}"
+        ) in markdown
+        assert (
+            f"- **WebAble orientation check exists:** "
+            f"{str(criterion['orientation_check_exists']).lower()}"
+        ) in markdown
+        assert (
+            f"- **WebAble non-text contrast check exists:** "
+            f"{str(criterion['non_text_contrast_check_exists']).lower()}"
+        ) in markdown
+        assert (
+            f"- **WebAble hover/focus-content check exists:** "
+            f"{str(criterion['hover_focus_content_check_exists']).lower()}"
+        ) in markdown
+        assert (
+            f"- **WebAble target-size check exists:** "
+            f"{str(criterion['target_size_check_exists']).lower()}"
         ) in markdown
         if not criterion["axe_rules"]:
             assert "- **Associated axe rules:** none with this criterion tag" in markdown

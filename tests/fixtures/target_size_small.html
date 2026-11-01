@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Small target fixture</title>
+  <style>
+    #small-target {
+      display: inline-flex;
+      width: 16px;
+      height: 16px;
+    }
+
+    #adequate-target {
+      width: 32px;
+      height: 32px;
+    }
+
+    #hidden-target {
+      display: none;
+      width: 8px;
+      height: 8px;
+    }
+  </style>
+</head>
+<body>
+  <a id="small-target" href="#content" aria-label="Small link"></a>
+  <button id="adequate-target" type="button">Continue</button>
+  <button id="hidden-target" type="button">Hidden</button>
+  <main id="content">Target size test</main>
+</body>
+</html>

@@ -4,12 +4,15 @@ import asyncio
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal, Protocol
+from typing import Any, Literal, Protocol
 
 from app.capture.url_safety import sanitize_url
 
 AccessibilityScanStatus = Literal[
     "available", "partial", "unavailable", "not_attempted"
+]
+NonTextContrastStatus = Literal[
+    "available", "partial", "unavailable", "not_tested"
 ]
 
 AXE_CORE_VERSION = "4.14.0"
@@ -34,6 +37,8 @@ MAX_CHECKS_PER_NODE = 30
 MAX_TOTAL_NODES = 1_000
 MAX_RELATED_NODES_PER_CHECK = 20
 MAX_SNIPPET_LENGTH = 2_000
+MAX_NON_TEXT_CONTRAST_ELEMENTS = 300
+MAX_NON_TEXT_CONTRAST_FINDINGS = 50
 _VALUE_ATTRIBUTE = re.compile(
     r"""(\bvalue\s*=\s*)(["']).*?\2""", re.IGNORECASE | re.DOTALL
 )
@@ -76,6 +81,30 @@ class AxeRuleEvidence:
 
 
 @dataclass(frozen=True)
+class NonTextContrastFinding:
+    classification: Literal["needs_review"]
+    potential_issue_detected: Literal[True]
+    confirmed_violation: Literal[False]
+    manual_review_required: Literal[True]
+    selector: str
+    tag_name: str
+    role: str | None
+    geometry: dict[str, float]
+    viewport: dict[str, int]
+    color_pairs: list[dict]
+    limitations: list[str]
+
+
+@dataclass(frozen=True)
+class NonTextContrastAuditResult:
+    status: NonTextContrastStatus
+    inspected_components: int = 0
+    inspected_graphics: int = 0
+    findings: list[NonTextContrastFinding] = field(default_factory=list)
+    details: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
 class AccessibilityScanResult:
     status: AccessibilityScanStatus
     axe_version: str | None = None
@@ -83,6 +112,12 @@ class AccessibilityScanResult:
     incomplete: list[AxeRuleEvidence] = field(default_factory=list)
     passes: list[AxeRuleEvidence] = field(default_factory=list)
     inapplicable: list[AxeRuleEvidence] = field(default_factory=list)
+    non_text_contrast: NonTextContrastAuditResult = field(
+        default_factory=lambda: NonTextContrastAuditResult(
+            status="not_tested",
+            details=["Non-text contrast audit was not attempted."],
+        )
+    )
     details: list[str] = field(default_factory=list)
 
 
@@ -90,8 +125,292 @@ class AccessibilityPage(Protocol):
     async def add_script_tag(self, *, content: str) -> object:
         ...
 
-    async def evaluate(self, expression: str, argument: list[str]) -> dict:
+    async def evaluate(self, expression: str, argument: Any) -> dict:
         ...
+
+
+_AUDIT_NON_TEXT_CONTRAST = """({maxElements, maxFindings}) => {
+  const selectorFor = element => {
+    if (element.id &&
+        document.querySelectorAll(`#${CSS.escape(element.id)}`).length === 1) {
+      return `#${CSS.escape(element.id)}`;
+    }
+    const parts = [];
+    for (let node = element; node && node.nodeType === Node.ELEMENT_NODE;
+         node = node.parentElement) {
+      let part = node.tagName.toLowerCase();
+      if (node.parentElement) {
+        const sameTag = [...node.parentElement.children]
+          .filter(child => child.tagName === node.tagName);
+        if (sameTag.length > 1) {
+          part += `:nth-of-type(${sameTag.indexOf(node) + 1})`;
+        }
+      }
+      parts.unshift(part);
+    }
+    return parts.join(" > ");
+  };
+  const visible = element => {
+    const style = getComputedStyle(element);
+    const rect = element.getBoundingClientRect();
+    return element.getClientRects().length > 0 &&
+      rect.width > 0 && rect.height > 0 &&
+      style.display !== "none" &&
+      style.visibility !== "hidden" &&
+      style.visibility !== "collapse" &&
+      style.contentVisibility !== "hidden" &&
+      Number(style.opacity) !== 0 &&
+      !element.closest("[hidden],[inert]");
+  };
+  const canvas = document.createElement("canvas");
+  canvas.width = 1;
+  canvas.height = 1;
+  const context = canvas.getContext("2d", {willReadFrequently: true});
+  const colorFor = value => {
+    if (!value || !context || !CSS.supports("color", value)) return null;
+    context.clearRect(0, 0, 1, 1);
+    context.fillStyle = "#000";
+    try {
+      context.fillStyle = value;
+      context.fillRect(0, 0, 1, 1);
+      return [...context.getImageData(0, 0, 1, 1).data]
+        .map((channel, index) => index === 3 ? channel / 255 : channel);
+    } catch (_error) {
+      return null;
+    }
+  };
+  const composite = (foreground, background) => {
+    if (!foreground || !background) return null;
+    const alpha = foreground[3] + background[3] * (1 - foreground[3]);
+    if (alpha <= 0) return null;
+    return [
+      (foreground[0] * foreground[3] +
+       background[0] * background[3] * (1 - foreground[3])) / alpha,
+      (foreground[1] * foreground[3] +
+       background[1] * background[3] * (1 - foreground[3])) / alpha,
+      (foreground[2] * foreground[3] +
+       background[2] * background[3] * (1 - foreground[3])) / alpha,
+      alpha
+    ];
+  };
+  const solidBackdrop = element => {
+    const ancestors = [];
+    for (let node = element.parentElement; node; node = node.parentElement) {
+      const style = getComputedStyle(node);
+      if (style.backgroundImage !== "none") return null;
+      const color = colorFor(style.backgroundColor);
+      if (color && color[3] > 0) ancestors.push(color);
+    }
+    let result = [255, 255, 255, 1];
+    for (let index = ancestors.length - 1; index >= 0; index -= 1) {
+      result = composite(ancestors[index], result);
+      if (!result) return null;
+    }
+    return result;
+  };
+  const opacityThrough = (element, stopAt) => {
+    let opacity = 1;
+    for (let node = element; node; node = node.parentElement) {
+      opacity *= Number(getComputedStyle(node).opacity);
+      if (node === stopAt) break;
+    }
+    return opacity;
+  };
+  const rgbOver = (color, backdrop, opacity) => {
+    if (!color || !backdrop || opacity < 1) return null;
+    const result = composite(color, backdrop);
+    if (!result || result[3] < 0.999) return null;
+    return result.slice(0, 3).map(channel => channel / 255);
+  };
+  const luminance = color => {
+    const linear = color.map(channel =>
+      channel <= 0.04045 ? channel / 12.92 :
+        ((channel + 0.055) / 1.055) ** 2.4
+    );
+    return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
+  };
+  const ratio = (first, second) => {
+    if (!first || !second) return null;
+    const firstLuminance = luminance(first);
+    const secondLuminance = luminance(second);
+    return (Math.max(firstLuminance, secondLuminance) + 0.05) /
+      (Math.min(firstLuminance, secondLuminance) + 0.05);
+  };
+  const elements = [...document.querySelectorAll([
+    "button", "input:not([type=hidden])", "select", "textarea",
+    "a[href]", "summary", "[role=button]", "[role=link]",
+    "[role=checkbox]", "[role=radio]", "[role=switch]", "[role=slider]",
+    "[role=tab]", "[role=combobox]", "[role=menuitem]",
+    "svg path", "svg circle", "svg rect", "svg line",
+    "svg polyline", "svg polygon", "svg ellipse"
+  ].join(","))].filter(visible);
+  const findings = [];
+  for (const element of elements.slice(0, maxElements)) {
+    const style = getComputedStyle(element);
+    const rect = element.getBoundingClientRect();
+    const backdrop = solidBackdrop(element);
+    const effectiveOpacity = opacityThrough(element, null);
+    const pairs = [];
+    const addPair = (part, colorValue, adjacent, opacity) => {
+      if (!backdrop || !colorValue || opacity < 1) return;
+      const rendered = rgbOver(colorFor(colorValue), backdrop, opacity);
+      const adjacentColor = rgbOver(adjacent, backdrop, 1);
+      const contrast = ratio(rendered, adjacentColor);
+      if (contrast !== null && contrast < 3) {
+        pairs.push({
+          visual_part: part,
+          foreground_color: colorValue,
+          adjacent_color: `rgb(${adjacentColor.map(value => Math.round(value * 255)).join(", ")})`,
+          contrast_ratio: Math.round(contrast * 100) / 100,
+          required_ratio: 3
+        });
+      }
+    };
+    const elementBackground = colorFor(style.backgroundColor);
+    const backgroundOpaque = elementBackground && elementBackground[3] > 0;
+    const isSvgShape = element.namespaceURI === "http://www.w3.org/2000/svg";
+    if (!isSvgShape && backgroundOpaque &&
+        style.backgroundImage === "none" &&
+        style.appearance !== "auto") {
+      addPair("component_background_boundary", style.backgroundColor, backdrop, effectiveOpacity);
+    }
+    if (isSvgShape) {
+      const fill = style.fill;
+      const stroke = style.stroke;
+      const fillOpacity = effectiveOpacity * Number(style.fillOpacity);
+      const strokeOpacity = effectiveOpacity * Number(style.strokeOpacity);
+      if (fill !== "none" && !fill.startsWith("url(")) {
+        addPair("svg_fill", fill, backdrop, fillOpacity);
+      }
+      if (stroke !== "none" && !stroke.startsWith("url(")) {
+        addPair("svg_stroke", stroke, backdrop, strokeOpacity);
+      }
+    } else {
+      for (const side of ["Top", "Right", "Bottom", "Left"]) {
+        const borderWidth = parseFloat(style[`border${side}Width`]) || 0;
+        const borderStyle = style[`border${side}Style`];
+        if (borderWidth > 0 && borderStyle !== "none" && borderStyle !== "hidden") {
+          addPair(
+            `border_${side.toLowerCase()}`,
+            style[`border${side}Color`],
+            backdrop,
+            effectiveOpacity
+          );
+        }
+      }
+      const outlineWidth = parseFloat(style.outlineWidth) || 0;
+      if (outlineWidth > 0 && style.outlineStyle !== "none") {
+        addPair("outline", style.outlineColor, backdrop, effectiveOpacity);
+      }
+    }
+    if (pairs.length) {
+      findings.push({
+        selector: selectorFor(element),
+        tag_name: element.tagName.toLowerCase(),
+        role: element.getAttribute("role"),
+        geometry: {
+          left: rect.left, top: rect.top, right: rect.right,
+          bottom: rect.bottom, width: rect.width, height: rect.height
+        },
+        color_pairs: pairs
+      });
+      if (findings.length >= maxFindings) break;
+    }
+  }
+  const graphics = [...document.querySelectorAll("img,canvas,video:not([controls])")]
+    .filter(visible);
+  return {
+    viewport: {width: innerWidth, height: innerHeight},
+    inspected_components: Math.min(elements.length, maxElements),
+    component_count: elements.length,
+    inspected_graphics: graphics.length,
+    candidates_truncated: elements.length > maxElements,
+    findings
+  };
+}""";
+
+
+async def audit_non_text_contrast(
+    page: AccessibilityPage,
+    *,
+    timeout_seconds: int = SCAN_TIMEOUT_SECONDS,
+) -> NonTextContrastAuditResult:
+    """Collect bounded CSS-color contrast candidates for manual evaluation."""
+    try:
+        raw = await asyncio.wait_for(
+            page.evaluate(
+                _AUDIT_NON_TEXT_CONTRAST,
+                {
+                    "maxElements": MAX_NON_TEXT_CONTRAST_ELEMENTS,
+                    "maxFindings": MAX_NON_TEXT_CONTRAST_FINDINGS,
+                },
+            ),
+            timeout=timeout_seconds,
+        )
+    except TimeoutError:
+        return NonTextContrastAuditResult(
+            status="unavailable",
+            details=["The non-text contrast probe exceeded its time limit."],
+        )
+    except Exception as error:
+        return NonTextContrastAuditResult(
+            status="unavailable",
+            details=[
+                f"The non-text contrast probe could not complete ({type(error).__name__})."
+            ],
+        )
+    try:
+        viewport = raw["viewport"]
+        findings = [
+            NonTextContrastFinding(
+                classification="needs_review",
+                potential_issue_detected=True,
+                confirmed_violation=False,
+                manual_review_required=True,
+                selector=item["selector"],
+                tag_name=item["tag_name"],
+                role=item.get("role"),
+                geometry=item["geometry"],
+                viewport=viewport,
+                color_pairs=item["color_pairs"],
+                limitations=[
+                    "A low computed-color ratio is a potential issue only; automation cannot determine whether this visual part is necessary to identify a component, state, or graphical object.",
+                    "CSS geometry and solid colors do not represent every rendered pixel, gradient, image, canvas, blend mode, or overlapping layer.",
+                ],
+            )
+            for item in raw["findings"]
+        ]
+        details = [
+            "The probe compares selected solid CSS component boundaries and SVG fills/strokes against an estimated adjacent solid background and reports ratios below 3:1 for manual review only."
+        ]
+        if raw["inspected_graphics"]:
+            details.append(
+                f"{raw['inspected_graphics']} visible image, canvas, or video elements were not pixel-sampled and require separate visual review."
+            )
+        if raw["candidates_truncated"]:
+            details.append(
+                f"Component discovery was capped at {MAX_NON_TEXT_CONTRAST_ELEMENTS}; absence of additional findings is inconclusive."
+            )
+        details.extend(
+            [
+                "Color pairs at or above 3:1 are not a pass: the probe does not establish that it found every required boundary or graphical object.",
+                "Potential low-contrast pairs are not confirmed violations because semantic necessity, applicable exceptions, and the complete rendered appearance require human evaluation.",
+            ]
+        )
+        return NonTextContrastAuditResult(
+            status="partial",
+            inspected_components=raw["inspected_components"],
+            inspected_graphics=raw["inspected_graphics"],
+            findings=findings,
+            details=details,
+        )
+    except (KeyError, TypeError, ValueError):
+        return NonTextContrastAuditResult(
+            status="unavailable",
+            details=[
+                "The non-text contrast probe returned an invalid evidence structure."
+            ],
+        )
 
 
 async def scan_accessibility(
@@ -167,6 +486,10 @@ async def scan_accessibility(
             details.append(
                 "The reported axe-core version did not match the pinned package version."
             )
+        non_text_contrast = await audit_non_text_contrast(
+            page,
+            timeout_seconds=timeout_seconds,
+        )
         return AccessibilityScanResult(
             status="partial" if details else "available",
             axe_version=axe_version,
@@ -174,6 +497,7 @@ async def scan_accessibility(
             incomplete=normalized["incomplete"],
             passes=normalized["passes"],
             inapplicable=normalized["inapplicable"],
+            non_text_contrast=non_text_contrast,
             details=details,
         )
     except (KeyError, TypeError, ValueError):

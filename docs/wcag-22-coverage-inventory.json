@@ -22,11 +22,13 @@
   "summary": {
     "criterion_count": 55,
     "mapped_criteria_with_enabled_selected_rules": 20,
+    "criteria_with_questionnaire_mapping": 55,
+    "manual_criteria_with_questionnaire_mapping": 26,
     "classification_counts": {
       "automated": 0,
-      "partial": 25,
+      "partial": 29,
       "manual_evaluation_required": 26,
-      "not_implemented": 4
+      "not_implemented": 0
     }
   },
   "scope_exclusions": [
@@ -57,12 +59,24 @@
       "criterion_url": "https://www.w3.org/TR/WCAG22/#non-text-content",
       "understanding_url": "https://www.w3.org/WAI/WCAG22/Understanding/non-text-content.html",
       "coverage_classification": "partial",
-      "automated_check_exists": true,
+      "questionnaire_question_ids": [
+        "visual.images_of_text"
+      ],
       "axe_check_exists": true,
       "keyboard_focus_check_exists": false,
       "keyboard_focus_checks": [],
       "text_reflow_check_exists": false,
       "text_reflow_checks": [],
+      "text_spacing_check_exists": false,
+      "text_spacing_checks": [],
+      "orientation_check_exists": false,
+      "orientation_checks": [],
+      "non_text_contrast_check_exists": false,
+      "non_text_contrast_checks": [],
+      "hover_focus_content_check_exists": false,
+      "hover_focus_content_checks": [],
+      "target_size_check_exists": false,
+      "target_size_checks": [],
       "axe_criterion_tag": "wcag111",
       "axe_rules": [
         {
@@ -210,6 +224,7 @@
           "help_url": "https://dequeuniversity.com/rules/axe/4.14/svg-img-alt?application=axeAPI"
         }
       ],
+      "automated_check_exists": true,
       "failure_patterns": [
         {
           "rule_id": "aria-meter-name",
@@ -284,12 +299,24 @@
       "criterion_url": "https://www.w3.org/TR/WCAG22/#audio-only-and-video-only-prerecorded",
       "understanding_url": "https://www.w3.org/WAI/WCAG22/Understanding/audio-only-and-video-only-prerecorded.html",
       "coverage_classification": "manual_evaluation_required",
-      "automated_check_exists": false,
+      "questionnaire_question_ids": [
+        "media.prerecorded_alternatives"
+      ],
       "axe_check_exists": false,
       "keyboard_focus_check_exists": false,
       "keyboard_focus_checks": [],
       "text_reflow_check_exists": false,
       "text_reflow_checks": [],
+      "text_spacing_check_exists": false,
+      "text_spacing_checks": [],
+      "orientation_check_exists": false,
+      "orientation_checks": [],
+      "non_text_contrast_check_exists": false,
+      "non_text_contrast_checks": [],
+      "hover_focus_content_check_exists": false,
+      "hover_focus_content_checks": [],
+      "target_size_check_exists": false,
+      "target_size_checks": [],
       "axe_criterion_tag": "wcag121",
       "axe_rules": [
         {
@@ -311,6 +338,7 @@
           "help_url": "https://dequeuniversity.com/rules/axe/4.14/audio-caption?application=axeAPI"
         }
       ],
+      "automated_check_exists": false,
       "failure_patterns": [],
       "limitations": [
         "No enabled axe rule selected by the current scanner carries this criterion's exact WCAG tag.",
@@ -341,12 +369,24 @@
       "criterion_url": "https://www.w3.org/TR/WCAG22/#captions-prerecorded",
       "understanding_url": "https://www.w3.org/WAI/WCAG22/Understanding/captions-prerecorded.html",
       "coverage_classification": "partial",
-      "automated_check_exists": true,
+      "questionnaire_question_ids": [
+        "media.prerecorded_captions"
+      ],
       "axe_check_exists": true,
       "keyboard_focus_check_exists": false,
       "keyboard_focus_checks": [],
       "text_reflow_check_exists": false,
       "text_reflow_checks": [],
+      "text_spacing_check_exists": false,
+      "text_spacing_checks": [],
+      "orientation_check_exists": false,
+      "orientation_checks": [],
+      "non_text_contrast_check_exists": false,
+      "non_text_contrast_checks": [],
+      "hover_focus_content_check_exists": false,
+      "hover_focus_content_checks": [],
+      "target_size_check_exists": false,
+      "target_size_checks": [],
       "axe_criterion_tag": "wcag122",
       "axe_rules": [
         {
@@ -371,6 +411,7 @@
           "help_url": "https://dequeuniversity.com/rules/axe/4.14/video-caption?application=axeAPI"
         }
       ],
+      "automated_check_exists": true,
       "failure_patterns": [
         {
           "rule_id": "video-caption",
@@ -407,14 +448,27 @@
       "criterion_url": "https://www.w3.org/TR/WCAG22/#audio-description-or-media-alternative-prerecorded",
       "understanding_url": "https://www.w3.org/WAI/WCAG22/Understanding/audio-description-or-media-alternative-prerecorded.html",
       "coverage_classification": "manual_evaluation_required",
-      "automated_check_exists": false,
+      "questionnaire_question_ids": [
+        "media.prerecorded_audio_description_or_alternative"
+      ],
       "axe_check_exists": false,
       "keyboard_focus_check_exists": false,
       "keyboard_focus_checks": [],
       "text_reflow_check_exists": false,
       "text_reflow_checks": [],
+      "text_spacing_check_exists": false,
+      "text_spacing_checks": [],
+      "orientation_check_exists": false,
+      "orientation_checks": [],
+      "non_text_contrast_check_exists": false,
+      "non_text_contrast_checks": [],
+      "hover_focus_content_check_exists": false,
+      "hover_focus_content_checks": [],
+      "target_size_check_exists": false,
+      "target_size_checks": [],
       "axe_criterion_tag": "wcag123",
       "axe_rules": [],
+      "automated_check_exists": false,
       "failure_patterns": [],
       "limitations": [
         "No enabled axe rule selected by the current scanner carries this criterion's exact WCAG tag.",
@@ -445,14 +499,27 @@
       "criterion_url": "https://www.w3.org/TR/WCAG22/#captions-live",
       "understanding_url": "https://www.w3.org/WAI/WCAG22/Understanding/captions-live.html",
       "coverage_classification": "manual_evaluation_required",
-      "automated_check_exists": false,
+      "questionnaire_question_ids": [
+        "media.live_captions"
+      ],
       "axe_check_exists": false,
       "keyboard_focus_check_exists": false,
       "keyboard_focus_checks": [],
       "text_reflow_check_exists": false,
       "text_reflow_checks": [],
+      "text_spacing_check_exists": false,
+      "text_spacing_checks": [],
+      "orientation_check_exists": false,
+      "orientation_checks": [],
+      "non_text_contrast_check_exists": false,
+      "non_text_contrast_checks": [],
+      "hover_focus_content_check_exists": false,
+      "hover_focus_content_checks": [],
+      "target_size_check_exists": false,
+      "target_size_checks": [],
       "axe_criterion_tag": "wcag124",
       "axe_rules": [],
+      "automated_check_exists": false,
       "failure_patterns": [],
       "limitations": [
         "No enabled axe rule selected by the current scanner carries this criterion's exact WCAG tag.",
@@ -483,14 +550,27 @@
       "criterion_url": "https://www.w3.org/TR/WCAG22/#audio-description-prerecorded",
       "understanding_url": "https://www.w3.org/WAI/WCAG22/Understanding/audio-description-prerecorded.html",
       "coverage_classification": "manual_evaluation_required",
-      "automated_check_exists": false,
+      "questionnaire_question_ids": [
+        "media.prerecorded_audio_description"
+      ],
       "axe_check_exists": false,
       "keyboard_focus_check_exists": false,
       "keyboard_focus_checks": [],
       "text_reflow_check_exists": false,
       "text_reflow_checks": [],
+      "text_spacing_check_exists": false,
+      "text_spacing_checks": [],
+      "orientation_check_exists": false,
+      "orientation_checks": [],
+      "non_text_contrast_check_exists": false,
+      "non_text_contrast_checks": [],
+      "hover_focus_content_check_exists": false,
+      "hover_focus_content_checks": [],
+      "target_size_check_exists": false,
+      "target_size_checks": [],
       "axe_criterion_tag": "wcag125",
       "axe_rules": [],
+      "automated_check_exists": false,
       "failure_patterns": [],
       "limitations": [
         "No enabled axe rule selected by the current scanner carries this criterion's exact WCAG tag.",
@@ -521,12 +601,24 @@
       "criterion_url": "https://www.w3.org/TR/WCAG22/#info-and-relationships",
       "understanding_url": "https://www.w3.org/WAI/WCAG22/Understanding/info-and-relationships.html",
       "coverage_classification": "partial",
-      "automated_check_exists": true,
+      "questionnaire_question_ids": [
+        "widgets.keyboard_operation"
+      ],
       "axe_check_exists": true,
       "keyboard_focus_check_exists": false,
       "keyboard_focus_checks": [],
       "text_reflow_check_exists": false,
       "text_reflow_checks": [],
+      "text_spacing_check_exists": false,
+      "text_spacing_checks": [],
+      "orientation_check_exists": false,
+      "orientation_checks": [],
+      "non_text_contrast_check_exists": false,
+      "non_text_contrast_checks": [],
+      "hover_focus_content_check_exists": false,
+      "hover_focus_content_checks": [],
+      "target_size_check_exists": false,
+      "target_size_checks": [],
       "axe_criterion_tag": "wcag131",
       "axe_rules": [
         {
@@ -753,6 +845,7 @@
           "help_url": "https://dequeuniversity.com/rules/axe/4.14/th-has-data-cells?application=axeAPI"
         }
       ],
+      "automated_check_exists": true,
       "failure_patterns": [
         {
           "rule_id": "aria-hidden-body",
@@ -839,14 +932,28 @@
       "criterion_url": "https://www.w3.org/TR/WCAG22/#meaningful-sequence",
       "understanding_url": "https://www.w3.org/WAI/WCAG22/Understanding/meaningful-sequence.html",
       "coverage_classification": "manual_evaluation_required",
-      "automated_check_exists": false,
+      "questionnaire_question_ids": [
+        "content.meaningful_sequence",
+        "layout.two_dimensional_content"
+      ],
       "axe_check_exists": false,
       "keyboard_focus_check_exists": false,
       "keyboard_focus_checks": [],
       "text_reflow_check_exists": false,
       "text_reflow_checks": [],
+      "text_spacing_check_exists": false,
+      "text_spacing_checks": [],
+      "orientation_check_exists": false,
+      "orientation_checks": [],
+      "non_text_contrast_check_exists": false,
+      "non_text_contrast_checks": [],
+      "hover_focus_content_check_exists": false,
+      "hover_focus_content_checks": [],
+      "target_size_check_exists": false,
+      "target_size_checks": [],
       "axe_criterion_tag": "wcag132",
       "axe_rules": [],
+      "automated_check_exists": false,
       "failure_patterns": [],
       "limitations": [
         "No enabled axe rule selected by the current scanner carries this criterion's exact WCAG tag.",
@@ -877,14 +984,29 @@
       "criterion_url": "https://www.w3.org/TR/WCAG22/#sensory-characteristics",
       "understanding_url": "https://www.w3.org/WAI/WCAG22/Understanding/sensory-characteristics.html",
       "coverage_classification": "manual_evaluation_required",
-      "automated_check_exists": false,
+      "questionnaire_question_ids": [
+        "content.sensory_instructions",
+        "forms.sensory_instructions",
+        "widgets.sensory_instructions"
+      ],
       "axe_check_exists": false,
       "keyboard_focus_check_exists": false,
       "keyboard_focus_checks": [],
       "text_reflow_check_exists": false,
       "text_reflow_checks": [],
+      "text_spacing_check_exists": false,
+      "text_spacing_checks": [],
+      "orientation_check_exists": false,
+      "orientation_checks": [],
+      "non_text_contrast_check_exists": false,
+      "non_text_contrast_checks": [],
+      "hover_focus_content_check_exists": false,
+      "hover_focus_content_checks": [],
+      "target_size_check_exists": false,
+      "target_size_checks": [],
       "axe_criterion_tag": "wcag133",
       "axe_rules": [],
+      "automated_check_exists": false,
       "failure_patterns": [],
       "limitations": [
         "No enabled axe rule selected by the current scanner carries this criterion's exact WCAG tag.",
@@ -914,13 +1036,28 @@
       "anchor": "orientation",
       "criterion_url": "https://www.w3.org/TR/WCAG22/#orientation",
       "understanding_url": "https://www.w3.org/WAI/WCAG22/Understanding/orientation.html",
-      "coverage_classification": "not_implemented",
-      "automated_check_exists": false,
+      "coverage_classification": "partial",
+      "questionnaire_question_ids": [
+        "content.orientation"
+      ],
       "axe_check_exists": false,
       "keyboard_focus_check_exists": false,
       "keyboard_focus_checks": [],
       "text_reflow_check_exists": false,
       "text_reflow_checks": [],
+      "text_spacing_check_exists": false,
+      "text_spacing_checks": [],
+      "orientation_check_exists": true,
+      "orientation_checks": [
+        "Switches the CSS viewport between paired portrait and landscape dimensions and compares up to 300 visible text-bearing elements and controls by selector and opaque content signature.",
+        "Reports elements that disappear or change content between orientations as needs-review evidence. The check cannot decide whether a change is equivalent or whether an orientation restriction is essential, and does not emulate physical device rotation or all orientation-change events."
+      ],
+      "non_text_contrast_check_exists": false,
+      "non_text_contrast_checks": [],
+      "hover_focus_content_check_exists": false,
+      "hover_focus_content_checks": [],
+      "target_size_check_exists": false,
+      "target_size_checks": [],
       "axe_criterion_tag": "wcag134",
       "axe_rules": [
         {
@@ -942,9 +1079,10 @@
           "help_url": "https://dequeuniversity.com/rules/axe/4.14/css-orientation-lock?application=axeAPI"
         }
       ],
+      "automated_check_exists": true,
       "failure_patterns": [],
       "limitations": [
-        "No enabled axe rule selected by the current scanner carries this criterion's exact WCAG tag.",
+        "No enabled axe rule selected by the current scanner carries this criterion's exact WCAG tag; the listed WebAble probes are separate, bounded evidence and do not establish criterion conformance.",
         "A WCAG tag records the axe rule author's criterion association; it is not evidence that the rule covers the full success criterion.",
         "The scanner records rule outcomes only when the rule runs and reports them. An absent result does not establish that the criterion passed."
       ],
@@ -956,9 +1094,12 @@
         "https://www.w3.org/TR/WCAG22/#orientation",
         "https://www.w3.org/WAI/WCAG22/Understanding/orientation.html"
       ],
-      "relevant_tests": [],
+      "relevant_tests": [
+        "tests/test_capture.py::test_orientation_flexible_fixture_preserves_content_and_restores_viewport",
+        "tests/test_capture.py::test_orientation_reports_content_and_control_changes_for_manual_review"
+      ],
       "outstanding_gaps": [
-        "Design and validate a criterion-specific check or interaction scenario before adding automated coverage; do not infer a pass from the absence of an axe mapping.",
+        "Validate the implemented checks with criterion-specific counterexamples against the criterion's Understanding guidance; retain manual review for aspects beyond their bounded scope.",
         "No result from this scan may be described as WCAG conformance."
       ]
     },
@@ -972,12 +1113,24 @@
       "criterion_url": "https://www.w3.org/TR/WCAG22/#identify-input-purpose",
       "understanding_url": "https://www.w3.org/WAI/WCAG22/Understanding/identify-input-purpose.html",
       "coverage_classification": "partial",
-      "automated_check_exists": true,
+      "questionnaire_question_ids": [
+        "forms.field_purpose"
+      ],
       "axe_check_exists": true,
       "keyboard_focus_check_exists": false,
       "keyboard_focus_checks": [],
       "text_reflow_check_exists": false,
       "text_reflow_checks": [],
+      "text_spacing_check_exists": false,
+      "text_spacing_checks": [],
+      "orientation_check_exists": false,
+      "orientation_checks": [],
+      "non_text_contrast_check_exists": false,
+      "non_text_contrast_checks": [],
+      "hover_focus_content_check_exists": false,
+      "hover_focus_content_checks": [],
+      "target_size_check_exists": false,
+      "target_size_checks": [],
       "axe_criterion_tag": "wcag135",
       "axe_rules": [
         {
@@ -999,6 +1152,7 @@
           "help_url": "https://dequeuniversity.com/rules/axe/4.14/autocomplete-valid?application=axeAPI"
         }
       ],
+      "automated_check_exists": true,
       "failure_patterns": [
         {
           "rule_id": "autocomplete-valid",
@@ -1035,12 +1189,24 @@
       "criterion_url": "https://www.w3.org/TR/WCAG22/#use-of-color",
       "understanding_url": "https://www.w3.org/WAI/WCAG22/Understanding/use-of-color.html",
       "coverage_classification": "partial",
-      "automated_check_exists": true,
+      "questionnaire_question_ids": [
+        "visual.color_and_contrast"
+      ],
       "axe_check_exists": true,
       "keyboard_focus_check_exists": false,
       "keyboard_focus_checks": [],
       "text_reflow_check_exists": false,
       "text_reflow_checks": [],
+      "text_spacing_check_exists": false,
+      "text_spacing_checks": [],
+      "orientation_check_exists": false,
+      "orientation_checks": [],
+      "non_text_contrast_check_exists": false,
+      "non_text_contrast_checks": [],
+      "hover_focus_content_check_exists": false,
+      "hover_focus_content_checks": [],
+      "target_size_check_exists": false,
+      "target_size_checks": [],
       "axe_criterion_tag": "wcag141",
       "axe_rules": [
         {
@@ -1063,6 +1229,7 @@
           "help_url": "https://dequeuniversity.com/rules/axe/4.14/link-in-text-block?application=axeAPI"
         }
       ],
+      "automated_check_exists": true,
       "failure_patterns": [
         {
           "rule_id": "link-in-text-block",
@@ -1099,12 +1266,24 @@
       "criterion_url": "https://www.w3.org/TR/WCAG22/#audio-control",
       "understanding_url": "https://www.w3.org/WAI/WCAG22/Understanding/audio-control.html",
       "coverage_classification": "partial",
-      "automated_check_exists": true,
+      "questionnaire_question_ids": [
+        "media.audio_control"
+      ],
       "axe_check_exists": true,
       "keyboard_focus_check_exists": false,
       "keyboard_focus_checks": [],
       "text_reflow_check_exists": false,
       "text_reflow_checks": [],
+      "text_spacing_check_exists": false,
+      "text_spacing_checks": [],
+      "orientation_check_exists": false,
+      "orientation_checks": [],
+      "non_text_contrast_check_exists": false,
+      "non_text_contrast_checks": [],
+      "hover_focus_content_check_exists": false,
+      "hover_focus_content_checks": [],
+      "target_size_check_exists": false,
+      "target_size_checks": [],
       "axe_criterion_tag": "wcag142",
       "axe_rules": [
         {
@@ -1128,6 +1307,7 @@
           "help_url": "https://dequeuniversity.com/rules/axe/4.14/no-autoplay-audio?application=axeAPI"
         }
       ],
+      "automated_check_exists": true,
       "failure_patterns": [
         {
           "rule_id": "no-autoplay-audio",
@@ -1164,12 +1344,24 @@
       "criterion_url": "https://www.w3.org/TR/WCAG22/#contrast-minimum",
       "understanding_url": "https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html",
       "coverage_classification": "partial",
-      "automated_check_exists": true,
+      "questionnaire_question_ids": [
+        "visual.color_and_contrast"
+      ],
       "axe_check_exists": true,
       "keyboard_focus_check_exists": false,
       "keyboard_focus_checks": [],
       "text_reflow_check_exists": false,
       "text_reflow_checks": [],
+      "text_spacing_check_exists": false,
+      "text_spacing_checks": [],
+      "orientation_check_exists": false,
+      "orientation_checks": [],
+      "non_text_contrast_check_exists": false,
+      "non_text_contrast_checks": [],
+      "hover_focus_content_check_exists": false,
+      "hover_focus_content_checks": [],
+      "target_size_check_exists": false,
+      "target_size_checks": [],
       "axe_criterion_tag": "wcag143",
       "axe_rules": [
         {
@@ -1193,6 +1385,7 @@
           "help_url": "https://dequeuniversity.com/rules/axe/4.14/color-contrast?application=axeAPI"
         }
       ],
+      "automated_check_exists": true,
       "failure_patterns": [
         {
           "rule_id": "color-contrast",
@@ -1231,7 +1424,9 @@
       "criterion_url": "https://www.w3.org/TR/WCAG22/#resize-text",
       "understanding_url": "https://www.w3.org/WAI/WCAG22/Understanding/resize-text.html",
       "coverage_classification": "partial",
-      "automated_check_exists": true,
+      "questionnaire_question_ids": [
+        "content.text_resize"
+      ],
       "axe_check_exists": true,
       "keyboard_focus_check_exists": false,
       "keyboard_focus_checks": [],
@@ -1239,6 +1434,16 @@
       "text_reflow_checks": [
         "A bounded per-element computed-font-size override probes 200% text for possible clipping, ellipsis, and overlap; text availability is not determined, so these observations require review."
       ],
+      "text_spacing_check_exists": false,
+      "text_spacing_checks": [],
+      "orientation_check_exists": false,
+      "orientation_checks": [],
+      "non_text_contrast_check_exists": false,
+      "non_text_contrast_checks": [],
+      "hover_focus_content_check_exists": false,
+      "hover_focus_content_checks": [],
+      "target_size_check_exists": false,
+      "target_size_checks": [],
       "axe_criterion_tag": "wcag144",
       "axe_rules": [
         {
@@ -1260,6 +1465,7 @@
           "help_url": "https://dequeuniversity.com/rules/axe/4.14/meta-viewport?application=axeAPI"
         }
       ],
+      "automated_check_exists": true,
       "failure_patterns": [
         {
           "rule_id": "meta-viewport",
@@ -1303,14 +1509,27 @@
       "criterion_url": "https://www.w3.org/TR/WCAG22/#images-of-text",
       "understanding_url": "https://www.w3.org/WAI/WCAG22/Understanding/images-of-text.html",
       "coverage_classification": "manual_evaluation_required",
-      "automated_check_exists": false,
+      "questionnaire_question_ids": [
+        "visual.images_of_text"
+      ],
       "axe_check_exists": false,
       "keyboard_focus_check_exists": false,
       "keyboard_focus_checks": [],
       "text_reflow_check_exists": false,
       "text_reflow_checks": [],
+      "text_spacing_check_exists": false,
+      "text_spacing_checks": [],
+      "orientation_check_exists": false,
+      "orientation_checks": [],
+      "non_text_contrast_check_exists": false,
+      "non_text_contrast_checks": [],
+      "hover_focus_content_check_exists": false,
+      "hover_focus_content_checks": [],
+      "target_size_check_exists": false,
+      "target_size_checks": [],
       "axe_criterion_tag": "wcag145",
       "axe_rules": [],
+      "automated_check_exists": false,
       "failure_patterns": [],
       "limitations": [
         "No enabled axe rule selected by the current scanner carries this criterion's exact WCAG tag.",
@@ -1341,7 +1560,9 @@
       "criterion_url": "https://www.w3.org/TR/WCAG22/#reflow",
       "understanding_url": "https://www.w3.org/WAI/WCAG22/Understanding/reflow.html",
       "coverage_classification": "partial",
-      "automated_check_exists": true,
+      "questionnaire_question_ids": [
+        "layout.two_dimensional_content"
+      ],
       "axe_check_exists": false,
       "keyboard_focus_check_exists": false,
       "keyboard_focus_checks": [],
@@ -1350,8 +1571,19 @@
         "The existing page is measured at 320 CSS pixels wide; text and document-level overflow are evidence for review, not violations by themselves.",
         "A 256 CSS-pixel height probe runs when a table or ARIA table/grid is detected; this heuristic does not determine whether an exception applies, and browser zoom is unsupported."
       ],
+      "text_spacing_check_exists": false,
+      "text_spacing_checks": [],
+      "orientation_check_exists": false,
+      "orientation_checks": [],
+      "non_text_contrast_check_exists": false,
+      "non_text_contrast_checks": [],
+      "hover_focus_content_check_exists": false,
+      "hover_focus_content_checks": [],
+      "target_size_check_exists": false,
+      "target_size_checks": [],
       "axe_criterion_tag": "wcag1410",
       "axe_rules": [],
+      "automated_check_exists": true,
       "failure_patterns": [],
       "limitations": [
         "No enabled axe rule selected by the current scanner carries this criterion's exact WCAG tag; the listed WebAble probes are separate, bounded evidence and do not establish criterion conformance.",
@@ -1386,18 +1618,34 @@
       "anchor": "non-text-contrast",
       "criterion_url": "https://www.w3.org/TR/WCAG22/#non-text-contrast",
       "understanding_url": "https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html",
-      "coverage_classification": "not_implemented",
-      "automated_check_exists": false,
+      "coverage_classification": "partial",
+      "questionnaire_question_ids": [
+        "visual.color_and_contrast"
+      ],
       "axe_check_exists": false,
       "keyboard_focus_check_exists": false,
       "keyboard_focus_checks": [],
       "text_reflow_check_exists": false,
       "text_reflow_checks": [],
+      "text_spacing_check_exists": false,
+      "text_spacing_checks": [],
+      "orientation_check_exists": false,
+      "orientation_checks": [],
+      "non_text_contrast_check_exists": true,
+      "non_text_contrast_checks": [
+        "Inspects up to 300 visible native controls, links, ARIA controls, and SVG shapes for solid computed CSS backgrounds, borders, outlines, fills, and strokes with estimated contrast below 3:1.",
+        "Reports measured color pairs and element geometry as needs-review evidence only. It cannot determine which visual boundary is necessary, evaluate pseudo-elements or box shadows, pixel-sample images/canvas/video, reliably resolve gradients and layered rendering, or establish that a low ratio violates the criterion."
+      ],
+      "hover_focus_content_check_exists": false,
+      "hover_focus_content_checks": [],
+      "target_size_check_exists": false,
+      "target_size_checks": [],
       "axe_criterion_tag": "wcag1411",
       "axe_rules": [],
+      "automated_check_exists": true,
       "failure_patterns": [],
       "limitations": [
-        "No enabled axe rule selected by the current scanner carries this criterion's exact WCAG tag.",
+        "No enabled axe rule selected by the current scanner carries this criterion's exact WCAG tag; the listed WebAble probes are separate, bounded evidence and do not establish criterion conformance.",
         "A WCAG tag records the axe rule author's criterion association; it is not evidence that the rule covers the full success criterion.",
         "The scanner records rule outcomes only when the rule runs and reports them. An absent result does not establish that the criterion passed."
       ],
@@ -1409,9 +1657,12 @@
         "https://www.w3.org/TR/WCAG22/#non-text-contrast",
         "https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html"
       ],
-      "relevant_tests": [],
+      "relevant_tests": [
+        "tests/test_capture.py::test_non_text_contrast_reports_solid_color_candidates_for_review",
+        "tests/test_capture.py::test_accessibility_scan_preserves_axe_results_and_specific_evidence"
+      ],
       "outstanding_gaps": [
-        "Design and validate a criterion-specific check or interaction scenario before adding automated coverage; do not infer a pass from the absence of an axe mapping.",
+        "Validate the implemented checks with criterion-specific counterexamples against the criterion's Understanding guidance; retain manual review for aspects beyond their bounded scope.",
         "No result from this scan may be described as WCAG conformance."
       ]
     },
@@ -1425,12 +1676,27 @@
       "criterion_url": "https://www.w3.org/TR/WCAG22/#text-spacing",
       "understanding_url": "https://www.w3.org/WAI/WCAG22/Understanding/text-spacing.html",
       "coverage_classification": "partial",
-      "automated_check_exists": true,
+      "questionnaire_question_ids": [
+        "content.text_spacing"
+      ],
       "axe_check_exists": true,
       "keyboard_focus_check_exists": false,
       "keyboard_focus_checks": [],
       "text_reflow_check_exists": false,
       "text_reflow_checks": [],
+      "text_spacing_check_exists": true,
+      "text_spacing_checks": [
+        "Applies line-height 1.5, paragraph margin after 2em, letter-spacing 0.12em, and word-spacing 0.16em to up to 300 visible text-bearing elements, then compares measurements with the captured baseline.",
+        "Reports changed clipping, overlap, container overflow, hidden text, or control visibility/hit testing as needs-review evidence; scrollable regions are identified and are not treated as violations."
+      ],
+      "orientation_check_exists": false,
+      "orientation_checks": [],
+      "non_text_contrast_check_exists": false,
+      "non_text_contrast_checks": [],
+      "hover_focus_content_check_exists": false,
+      "hover_focus_content_checks": [],
+      "target_size_check_exists": false,
+      "target_size_checks": [],
       "axe_criterion_tag": "wcag1412",
       "axe_rules": [
         {
@@ -1450,6 +1716,7 @@
           "help_url": "https://dequeuniversity.com/rules/axe/4.14/avoid-inline-spacing?application=axeAPI"
         }
       ],
+      "automated_check_exists": true,
       "failure_patterns": [
         {
           "rule_id": "avoid-inline-spacing",
@@ -1470,7 +1737,15 @@
         "https://www.w3.org/WAI/WCAG22/Understanding/text-spacing.html",
         "https://dequeuniversity.com/rules/axe/4.14/avoid-inline-spacing?application=axeAPI"
       ],
-      "relevant_tests": [],
+      "relevant_tests": [
+        "tests/test_capture.py::test_text_spacing_usable_fixture_has_no_detected_geometry_issue",
+        "tests/test_capture.py::test_text_spacing_reports_fixed_height_clipping_for_review",
+        "tests/test_capture.py::test_text_spacing_reports_new_overlap_without_claiming_violation",
+        "tests/test_capture.py::test_text_spacing_reports_control_label_clipping_for_review",
+        "tests/test_capture.py::test_text_spacing_reports_control_obscured_after_content_reflows",
+        "tests/test_capture.py::test_text_spacing_keeps_scrollable_region_as_review_not_failure",
+        "tests/test_capture.py::test_text_spacing_overrides_restore_after_screenshot_failure"
+      ],
       "outstanding_gaps": [
         "Validate the implemented checks with criterion-specific counterexamples against the criterion's Understanding guidance; retain manual review for aspects beyond their bounded scope.",
         "No result from this scan may be described as WCAG conformance."
@@ -1485,18 +1760,34 @@
       "anchor": "content-on-hover-or-focus",
       "criterion_url": "https://www.w3.org/TR/WCAG22/#content-on-hover-or-focus",
       "understanding_url": "https://www.w3.org/WAI/WCAG22/Understanding/content-on-hover-or-focus.html",
-      "coverage_classification": "not_implemented",
-      "automated_check_exists": false,
+      "coverage_classification": "partial",
+      "questionnaire_question_ids": [
+        "widgets.hover_focus_content"
+      ],
       "axe_check_exists": false,
       "keyboard_focus_check_exists": false,
       "keyboard_focus_checks": [],
       "text_reflow_check_exists": false,
       "text_reflow_checks": [],
+      "text_spacing_check_exists": false,
+      "text_spacing_checks": [],
+      "orientation_check_exists": false,
+      "orientation_checks": [],
+      "non_text_contrast_check_exists": false,
+      "non_text_contrast_checks": [],
+      "hover_focus_content_check_exists": true,
+      "hover_focus_content_checks": [
+        "Samples up to four visible likely triggers without activating them, compares visible DOM content before and after pointer hover and focus, and records newly revealed content with trigger/content selectors, geometry, viewport, role, and opaque text signatures.",
+        "For revealed content, samples whether pointer entry keeps hover content visible, whether Escape dismisses it, whether it remains after focus blur, and whether its rectangle intersects other content. Findings remain needs-review evidence; custom triggers, pseudo-elements, native tooltips, delayed states, and semantic exceptions are not fully evaluated."
+      ],
+      "target_size_check_exists": false,
+      "target_size_checks": [],
       "axe_criterion_tag": "wcag1413",
       "axe_rules": [],
+      "automated_check_exists": true,
       "failure_patterns": [],
       "limitations": [
-        "No enabled axe rule selected by the current scanner carries this criterion's exact WCAG tag.",
+        "No enabled axe rule selected by the current scanner carries this criterion's exact WCAG tag; the listed WebAble probes are separate, bounded evidence and do not establish criterion conformance.",
         "A WCAG tag records the axe rule author's criterion association; it is not evidence that the rule covers the full success criterion.",
         "The scanner records rule outcomes only when the rule runs and reports them. An absent result does not establish that the criterion passed."
       ],
@@ -1508,9 +1799,14 @@
         "https://www.w3.org/TR/WCAG22/#content-on-hover-or-focus",
         "https://www.w3.org/WAI/WCAG22/Understanding/content-on-hover-or-focus.html"
       ],
-      "relevant_tests": [],
+      "relevant_tests": [
+        "tests/test_capture.py::test_hover_focus_compliant_tooltip_records_behavior_and_restores_focus",
+        "tests/test_capture.py::test_hover_focus_reports_content_that_pointer_cannot_enter",
+        "tests/test_capture.py::test_hover_focus_reports_undismissable_overlapping_focus_content",
+        "tests/test_capture.py::test_hover_focus_ignores_style_only_hover_changes"
+      ],
       "outstanding_gaps": [
-        "Design and validate a criterion-specific check or interaction scenario before adding automated coverage; do not infer a pass from the absence of an axe mapping.",
+        "Validate the implemented checks with criterion-specific counterexamples against the criterion's Understanding guidance; retain manual review for aspects beyond their bounded scope.",
         "No result from this scan may be described as WCAG conformance."
       ]
     },
@@ -1524,14 +1820,26 @@
       "criterion_url": "https://www.w3.org/TR/WCAG22/#keyboard",
       "understanding_url": "https://www.w3.org/WAI/WCAG22/Understanding/keyboard.html",
       "coverage_classification": "partial",
-      "automated_check_exists": true,
+      "questionnaire_question_ids": [
+        "widgets.keyboard_operation"
+      ],
       "axe_check_exists": true,
       "keyboard_focus_check_exists": true,
       "keyboard_focus_checks": [
-        "Sequential Tab/Shift+Tab focus progression is sampled without activating controls."
+        "Sequential Tab/Shift+Tab focus progression is sampled without activating controls; up to 51 Tab actions cover the 50-candidate discovery cap plus one boundary action."
       ],
       "text_reflow_check_exists": false,
       "text_reflow_checks": [],
+      "text_spacing_check_exists": false,
+      "text_spacing_checks": [],
+      "orientation_check_exists": false,
+      "orientation_checks": [],
+      "non_text_contrast_check_exists": false,
+      "non_text_contrast_checks": [],
+      "hover_focus_content_check_exists": false,
+      "hover_focus_content_checks": [],
+      "target_size_check_exists": false,
+      "target_size_checks": [],
       "axe_criterion_tag": "wcag211",
       "axe_rules": [
         {
@@ -1596,6 +1904,7 @@
           "help_url": "https://dequeuniversity.com/rules/axe/4.14/server-side-image-map?application=axeAPI"
         }
       ],
+      "automated_check_exists": true,
       "failure_patterns": [
         {
           "rule_id": "frame-focusable-content",
@@ -1628,7 +1937,11 @@
         "https://dequeuniversity.com/rules/axe/4.14/scrollable-region-focusable?application=axeAPI",
         "https://dequeuniversity.com/rules/axe/4.14/server-side-image-map?application=axeAPI"
       ],
-      "relevant_tests": [],
+      "relevant_tests": [
+        "tests/test_capture.py::test_keyboard_audit_records_visible_keyboard_focus",
+        "tests/test_capture.py::test_keyboard_audit_traverses_more_than_twenty_sequential_targets",
+        "tests/test_capture.py::test_keyboard_audit_reports_interactive_candidate_skipped_by_tab"
+      ],
       "outstanding_gaps": [
         "Validate the implemented checks with criterion-specific counterexamples against the criterion's Understanding guidance; retain manual review for aspects beyond their bounded scope.",
         "No result from this scan may be described as WCAG conformance."
@@ -1644,16 +1957,29 @@
       "criterion_url": "https://www.w3.org/TR/WCAG22/#no-keyboard-trap",
       "understanding_url": "https://www.w3.org/WAI/WCAG22/Understanding/no-keyboard-trap.html",
       "coverage_classification": "partial",
-      "automated_check_exists": true,
+      "questionnaire_question_ids": [
+        "widgets.keyboard_operation"
+      ],
       "axe_check_exists": false,
       "keyboard_focus_check_exists": true,
       "keyboard_focus_checks": [
-        "A bounded Tab sequence looks for focus that stops advancing; suspected traps require review."
+        "A repeated consecutive Tab target is distinguished from a focus cycle; when Tab stalls, the bounded Shift+Tab sample records whether focus moves from that target. Repeated multi-target Tab cycles are also compared with reverse traversal. Evidence remains review-only because focus cycling does not establish whether a containing widget can be exited or dismissed."
       ],
       "text_reflow_check_exists": false,
       "text_reflow_checks": [],
+      "text_spacing_check_exists": false,
+      "text_spacing_checks": [],
+      "orientation_check_exists": false,
+      "orientation_checks": [],
+      "non_text_contrast_check_exists": false,
+      "non_text_contrast_checks": [],
+      "hover_focus_content_check_exists": false,
+      "hover_focus_content_checks": [],
+      "target_size_check_exists": false,
+      "target_size_checks": [],
       "axe_criterion_tag": "wcag212",
       "axe_rules": [],
+      "automated_check_exists": true,
       "failure_patterns": [],
       "limitations": [
         "No enabled axe rule selected by the current scanner carries this criterion's exact WCAG tag; the listed WebAble probes are separate, bounded evidence and do not establish criterion conformance.",
@@ -1668,7 +1994,11 @@
         "https://www.w3.org/TR/WCAG22/#no-keyboard-trap",
         "https://www.w3.org/WAI/WCAG22/Understanding/no-keyboard-trap.html"
       ],
-      "relevant_tests": [],
+      "relevant_tests": [
+        "tests/test_capture.py::test_keyboard_audit_reports_potential_focus_trap_for_review",
+        "tests/test_capture.py::test_keyboard_audit_distinguishes_one_way_tab_block_from_trap",
+        "tests/test_capture.py::test_keyboard_audit_reports_wrapping_cycle_for_manual_review"
+      ],
       "outstanding_gaps": [
         "Validate the implemented checks with criterion-specific counterexamples against the criterion's Understanding guidance; retain manual review for aspects beyond their bounded scope.",
         "No result from this scan may be described as WCAG conformance."
@@ -1684,14 +2014,27 @@
       "criterion_url": "https://www.w3.org/TR/WCAG22/#character-key-shortcuts",
       "understanding_url": "https://www.w3.org/WAI/WCAG22/Understanding/character-key-shortcuts.html",
       "coverage_classification": "manual_evaluation_required",
-      "automated_check_exists": false,
+      "questionnaire_question_ids": [
+        "keyboard.character_shortcuts"
+      ],
       "axe_check_exists": false,
       "keyboard_focus_check_exists": false,
       "keyboard_focus_checks": [],
       "text_reflow_check_exists": false,
       "text_reflow_checks": [],
+      "text_spacing_check_exists": false,
+      "text_spacing_checks": [],
+      "orientation_check_exists": false,
+      "orientation_checks": [],
+      "non_text_contrast_check_exists": false,
+      "non_text_contrast_checks": [],
+      "hover_focus_content_check_exists": false,
+      "hover_focus_content_checks": [],
+      "target_size_check_exists": false,
+      "target_size_checks": [],
       "axe_criterion_tag": "wcag214",
       "axe_rules": [],
+      "automated_check_exists": false,
       "failure_patterns": [],
       "limitations": [
         "No enabled axe rule selected by the current scanner carries this criterion's exact WCAG tag.",
@@ -1722,12 +2065,24 @@
       "criterion_url": "https://www.w3.org/TR/WCAG22/#timing-adjustable",
       "understanding_url": "https://www.w3.org/WAI/WCAG22/Understanding/timing-adjustable.html",
       "coverage_classification": "partial",
-      "automated_check_exists": true,
+      "questionnaire_question_ids": [
+        "timing.adjustment"
+      ],
       "axe_check_exists": true,
       "keyboard_focus_check_exists": false,
       "keyboard_focus_checks": [],
       "text_reflow_check_exists": false,
       "text_reflow_checks": [],
+      "text_spacing_check_exists": false,
+      "text_spacing_checks": [],
+      "orientation_check_exists": false,
+      "orientation_checks": [],
+      "non_text_contrast_check_exists": false,
+      "non_text_contrast_checks": [],
+      "hover_focus_content_check_exists": false,
+      "hover_focus_content_checks": [],
+      "target_size_check_exists": false,
+      "target_size_checks": [],
       "axe_criterion_tag": "wcag221",
       "axe_rules": [
         {
@@ -1750,6 +2105,7 @@
           "help_url": "https://dequeuniversity.com/rules/axe/4.14/meta-refresh?application=axeAPI"
         }
       ],
+      "automated_check_exists": true,
       "failure_patterns": [
         {
           "rule_id": "meta-refresh",
@@ -1786,12 +2142,24 @@
       "criterion_url": "https://www.w3.org/TR/WCAG22/#pause-stop-hide",
       "understanding_url": "https://www.w3.org/WAI/WCAG22/Understanding/pause-stop-hide.html",
       "coverage_classification": "partial",
-      "automated_check_exists": true,
+      "questionnaire_question_ids": [
+        "motion.pause_and_flash"
+      ],
       "axe_check_exists": true,
       "keyboard_focus_check_exists": false,
       "keyboard_focus_checks": [],
       "text_reflow_check_exists": false,
       "text_reflow_checks": [],
+      "text_spacing_check_exists": false,
+      "text_spacing_checks": [],
+      "orientation_check_exists": false,
+      "orientation_checks": [],
+      "non_text_contrast_check_exists": false,
+      "non_text_contrast_checks": [],
+      "hover_focus_content_check_exists": false,
+      "hover_focus_content_checks": [],
+      "target_size_check_exists": false,
+      "target_size_checks": [],
       "axe_criterion_tag": "wcag222",
       "axe_rules": [
         {
@@ -1835,6 +2203,7 @@
           "help_url": "https://dequeuniversity.com/rules/axe/4.14/marquee?application=axeAPI"
         }
       ],
+      "automated_check_exists": true,
       "failure_patterns": [
         {
           "rule_id": "blink",
@@ -1877,14 +2246,27 @@
       "criterion_url": "https://www.w3.org/TR/WCAG22/#three-flashes-or-below-threshold",
       "understanding_url": "https://www.w3.org/WAI/WCAG22/Understanding/three-flashes-or-below-threshold.html",
       "coverage_classification": "manual_evaluation_required",
-      "automated_check_exists": false,
+      "questionnaire_question_ids": [
+        "motion.flash_threshold"
+      ],
       "axe_check_exists": false,
       "keyboard_focus_check_exists": false,
       "keyboard_focus_checks": [],
       "text_reflow_check_exists": false,
       "text_reflow_checks": [],
+      "text_spacing_check_exists": false,
+      "text_spacing_checks": [],
+      "orientation_check_exists": false,
+      "orientation_checks": [],
+      "non_text_contrast_check_exists": false,
+      "non_text_contrast_checks": [],
+      "hover_focus_content_check_exists": false,
+      "hover_focus_content_checks": [],
+      "target_size_check_exists": false,
+      "target_size_checks": [],
       "axe_criterion_tag": "wcag231",
       "axe_rules": [],
+      "automated_check_exists": false,
       "failure_patterns": [],
       "limitations": [
         "No enabled axe rule selected by the current scanner carries this criterion's exact WCAG tag.",
@@ -1915,12 +2297,24 @@
       "criterion_url": "https://www.w3.org/TR/WCAG22/#bypass-blocks",
       "understanding_url": "https://www.w3.org/WAI/WCAG22/Understanding/bypass-blocks.html",
       "coverage_classification": "partial",
-      "automated_check_exists": true,
+      "questionnaire_question_ids": [
+        "pages.bypass_repeated_blocks"
+      ],
       "axe_check_exists": true,
       "keyboard_focus_check_exists": false,
       "keyboard_focus_checks": [],
       "text_reflow_check_exists": false,
       "text_reflow_checks": [],
+      "text_spacing_check_exists": false,
+      "text_spacing_checks": [],
+      "orientation_check_exists": false,
+      "orientation_checks": [],
+      "non_text_contrast_check_exists": false,
+      "non_text_contrast_checks": [],
+      "hover_focus_content_check_exists": false,
+      "hover_focus_content_checks": [],
+      "target_size_check_exists": false,
+      "target_size_checks": [],
       "axe_criterion_tag": "wcag241",
       "axe_rules": [
         {
@@ -1945,6 +2339,7 @@
           "help_url": "https://dequeuniversity.com/rules/axe/4.14/bypass?application=axeAPI"
         }
       ],
+      "automated_check_exists": true,
       "failure_patterns": [
         {
           "rule_id": "bypass",
@@ -1981,12 +2376,24 @@
       "criterion_url": "https://www.w3.org/TR/WCAG22/#page-titled",
       "understanding_url": "https://www.w3.org/WAI/WCAG22/Understanding/page-titled.html",
       "coverage_classification": "partial",
-      "automated_check_exists": true,
+      "questionnaire_question_ids": [
+        "pages.descriptive_titles"
+      ],
       "axe_check_exists": true,
       "keyboard_focus_check_exists": false,
       "keyboard_focus_checks": [],
       "text_reflow_check_exists": false,
       "text_reflow_checks": [],
+      "text_spacing_check_exists": false,
+      "text_spacing_checks": [],
+      "orientation_check_exists": false,
+      "orientation_checks": [],
+      "non_text_contrast_check_exists": false,
+      "non_text_contrast_checks": [],
+      "hover_focus_content_check_exists": false,
+      "hover_focus_content_checks": [],
+      "target_size_check_exists": false,
+      "target_size_checks": [],
       "axe_criterion_tag": "wcag242",
       "axe_rules": [
         {
@@ -2010,6 +2417,7 @@
           "help_url": "https://dequeuniversity.com/rules/axe/4.14/document-title?application=axeAPI"
         }
       ],
+      "automated_check_exists": true,
       "failure_patterns": [
         {
           "rule_id": "document-title",
@@ -2046,16 +2454,29 @@
       "criterion_url": "https://www.w3.org/TR/WCAG22/#focus-order",
       "understanding_url": "https://www.w3.org/WAI/WCAG22/Understanding/focus-order.html",
       "coverage_classification": "partial",
-      "automated_check_exists": true,
+      "questionnaire_question_ids": [
+        "widgets.keyboard_operation"
+      ],
       "axe_check_exists": false,
       "keyboard_focus_check_exists": true,
       "keyboard_focus_checks": [
-        "The observed Tab sequence is recorded; whether its order preserves meaning requires human review."
+        "The expanded bounded Tab sequence is recorded; whether its order preserves meaning requires human review."
       ],
       "text_reflow_check_exists": false,
       "text_reflow_checks": [],
+      "text_spacing_check_exists": false,
+      "text_spacing_checks": [],
+      "orientation_check_exists": false,
+      "orientation_checks": [],
+      "non_text_contrast_check_exists": false,
+      "non_text_contrast_checks": [],
+      "hover_focus_content_check_exists": false,
+      "hover_focus_content_checks": [],
+      "target_size_check_exists": false,
+      "target_size_checks": [],
       "axe_criterion_tag": "wcag243",
       "axe_rules": [],
+      "automated_check_exists": true,
       "failure_patterns": [],
       "limitations": [
         "No enabled axe rule selected by the current scanner carries this criterion's exact WCAG tag; the listed WebAble probes are separate, bounded evidence and do not establish criterion conformance.",
@@ -2086,12 +2507,24 @@
       "criterion_url": "https://www.w3.org/TR/WCAG22/#link-purpose-in-context",
       "understanding_url": "https://www.w3.org/WAI/WCAG22/Understanding/link-purpose-in-context.html",
       "coverage_classification": "partial",
-      "automated_check_exists": true,
+      "questionnaire_question_ids": [
+        "pages.link_purpose"
+      ],
       "axe_check_exists": true,
       "keyboard_focus_check_exists": false,
       "keyboard_focus_checks": [],
       "text_reflow_check_exists": false,
       "text_reflow_checks": [],
+      "text_spacing_check_exists": false,
+      "text_spacing_checks": [],
+      "orientation_check_exists": false,
+      "orientation_checks": [],
+      "non_text_contrast_check_exists": false,
+      "non_text_contrast_checks": [],
+      "hover_focus_content_check_exists": false,
+      "hover_focus_content_checks": [],
+      "target_size_check_exists": false,
+      "target_size_checks": [],
       "axe_criterion_tag": "wcag244",
       "axe_rules": [
         {
@@ -2143,6 +2576,7 @@
           "help_url": "https://dequeuniversity.com/rules/axe/4.14/link-name?application=axeAPI"
         }
       ],
+      "automated_check_exists": true,
       "failure_patterns": [
         {
           "rule_id": "area-alt",
@@ -2185,14 +2619,27 @@
       "criterion_url": "https://www.w3.org/TR/WCAG22/#multiple-ways",
       "understanding_url": "https://www.w3.org/WAI/WCAG22/Understanding/multiple-ways.html",
       "coverage_classification": "manual_evaluation_required",
-      "automated_check_exists": false,
+      "questionnaire_question_ids": [
+        "pages.multiple_ways_to_find"
+      ],
       "axe_check_exists": false,
       "keyboard_focus_check_exists": false,
       "keyboard_focus_checks": [],
       "text_reflow_check_exists": false,
       "text_reflow_checks": [],
+      "text_spacing_check_exists": false,
+      "text_spacing_checks": [],
+      "orientation_check_exists": false,
+      "orientation_checks": [],
+      "non_text_contrast_check_exists": false,
+      "non_text_contrast_checks": [],
+      "hover_focus_content_check_exists": false,
+      "hover_focus_content_checks": [],
+      "target_size_check_exists": false,
+      "target_size_checks": [],
       "axe_criterion_tag": "wcag245",
       "axe_rules": [],
+      "automated_check_exists": false,
       "failure_patterns": [],
       "limitations": [
         "No enabled axe rule selected by the current scanner carries this criterion's exact WCAG tag.",
@@ -2223,14 +2670,27 @@
       "criterion_url": "https://www.w3.org/TR/WCAG22/#headings-and-labels",
       "understanding_url": "https://www.w3.org/WAI/WCAG22/Understanding/headings-and-labels.html",
       "coverage_classification": "manual_evaluation_required",
-      "automated_check_exists": false,
+      "questionnaire_question_ids": [
+        "content.headings_and_labels"
+      ],
       "axe_check_exists": false,
       "keyboard_focus_check_exists": false,
       "keyboard_focus_checks": [],
       "text_reflow_check_exists": false,
       "text_reflow_checks": [],
+      "text_spacing_check_exists": false,
+      "text_spacing_checks": [],
+      "orientation_check_exists": false,
+      "orientation_checks": [],
+      "non_text_contrast_check_exists": false,
+      "non_text_contrast_checks": [],
+      "hover_focus_content_check_exists": false,
+      "hover_focus_content_checks": [],
+      "target_size_check_exists": false,
+      "target_size_checks": [],
       "axe_criterion_tag": "wcag246",
       "axe_rules": [],
+      "automated_check_exists": false,
       "failure_patterns": [],
       "limitations": [
         "No enabled axe rule selected by the current scanner carries this criterion's exact WCAG tag.",
@@ -2261,7 +2721,9 @@
       "criterion_url": "https://www.w3.org/TR/WCAG22/#focus-visible",
       "understanding_url": "https://www.w3.org/WAI/WCAG22/Understanding/focus-visible.html",
       "coverage_classification": "partial",
-      "automated_check_exists": true,
+      "questionnaire_question_ids": [
+        "widgets.keyboard_operation"
+      ],
       "axe_check_exists": false,
       "keyboard_focus_check_exists": true,
       "keyboard_focus_checks": [
@@ -2269,8 +2731,19 @@
       ],
       "text_reflow_check_exists": false,
       "text_reflow_checks": [],
+      "text_spacing_check_exists": false,
+      "text_spacing_checks": [],
+      "orientation_check_exists": false,
+      "orientation_checks": [],
+      "non_text_contrast_check_exists": false,
+      "non_text_contrast_checks": [],
+      "hover_focus_content_check_exists": false,
+      "hover_focus_content_checks": [],
+      "target_size_check_exists": false,
+      "target_size_checks": [],
       "axe_criterion_tag": "wcag247",
       "axe_rules": [],
+      "automated_check_exists": true,
       "failure_patterns": [],
       "limitations": [
         "No enabled axe rule selected by the current scanner carries this criterion's exact WCAG tag; the listed WebAble probes are separate, bounded evidence and do not establish criterion conformance.",
@@ -2301,16 +2774,30 @@
       "criterion_url": "https://www.w3.org/TR/WCAG22/#focus-not-obscured-minimum",
       "understanding_url": "https://www.w3.org/WAI/WCAG22/Understanding/focus-not-obscured-minimum.html",
       "coverage_classification": "partial",
-      "automated_check_exists": true,
+      "questionnaire_question_ids": [
+        "widgets.focus_not_obscured"
+      ],
       "axe_check_exists": false,
       "keyboard_focus_check_exists": true,
       "keyboard_focus_checks": [
-        "Hit-testing samples focused-element points for possible complete occlusion."
+        "Samples a 5x5 interior hit-test grid for each keyboard-focused target, records its bounding rectangle and viewport, and identifies layered elements intercepting samples.",
+        "Classifies a full-cover candidate as a high-confidence failure only when one layered element covers the entire in-viewport target, intercepts every sample, has a fully opaque computed background and effective opacity of 1, and has no detected clip-path or mask; partial, translucent, clipped, or otherwise ambiguous overlap requires manual review."
       ],
       "text_reflow_check_exists": false,
       "text_reflow_checks": [],
+      "text_spacing_check_exists": false,
+      "text_spacing_checks": [],
+      "orientation_check_exists": false,
+      "orientation_checks": [],
+      "non_text_contrast_check_exists": false,
+      "non_text_contrast_checks": [],
+      "hover_focus_content_check_exists": false,
+      "hover_focus_content_checks": [],
+      "target_size_check_exists": false,
+      "target_size_checks": [],
       "axe_criterion_tag": "wcag2411",
       "axe_rules": [],
+      "automated_check_exists": true,
       "failure_patterns": [],
       "limitations": [
         "No enabled axe rule selected by the current scanner carries this criterion's exact WCAG tag; the listed WebAble probes are separate, bounded evidence and do not establish criterion conformance.",
@@ -2325,7 +2812,13 @@
         "https://www.w3.org/TR/WCAG22/#focus-not-obscured-minimum",
         "https://www.w3.org/WAI/WCAG22/Understanding/focus-not-obscured-minimum.html"
       ],
-      "relevant_tests": [],
+      "relevant_tests": [
+        "tests/test_capture.py::test_keyboard_audit_reports_focus_obscuration_for_review",
+        "tests/test_capture.py::test_keyboard_audit_confirms_opaque_full_cover_with_evidence",
+        "tests/test_capture.py::test_keyboard_audit_classifies_sticky_header_overlap_as_potential",
+        "tests/test_capture.py::test_keyboard_audit_detects_opaque_dialog_cover",
+        "tests/test_capture.py::test_keyboard_audit_reports_no_sampled_occlusion_without_overlay"
+      ],
       "outstanding_gaps": [
         "Validate the implemented checks with criterion-specific counterexamples against the criterion's Understanding guidance; retain manual review for aspects beyond their bounded scope.",
         "No result from this scan may be described as WCAG conformance."
@@ -2341,14 +2834,27 @@
       "criterion_url": "https://www.w3.org/TR/WCAG22/#pointer-gestures",
       "understanding_url": "https://www.w3.org/WAI/WCAG22/Understanding/pointer-gestures.html",
       "coverage_classification": "manual_evaluation_required",
-      "automated_check_exists": false,
+      "questionnaire_question_ids": [
+        "pointer.gesture_alternative"
+      ],
       "axe_check_exists": false,
       "keyboard_focus_check_exists": false,
       "keyboard_focus_checks": [],
       "text_reflow_check_exists": false,
       "text_reflow_checks": [],
+      "text_spacing_check_exists": false,
+      "text_spacing_checks": [],
+      "orientation_check_exists": false,
+      "orientation_checks": [],
+      "non_text_contrast_check_exists": false,
+      "non_text_contrast_checks": [],
+      "hover_focus_content_check_exists": false,
+      "hover_focus_content_checks": [],
+      "target_size_check_exists": false,
+      "target_size_checks": [],
       "axe_criterion_tag": "wcag251",
       "axe_rules": [],
+      "automated_check_exists": false,
       "failure_patterns": [],
       "limitations": [
         "No enabled axe rule selected by the current scanner carries this criterion's exact WCAG tag.",
@@ -2379,14 +2885,27 @@
       "criterion_url": "https://www.w3.org/TR/WCAG22/#pointer-cancellation",
       "understanding_url": "https://www.w3.org/WAI/WCAG22/Understanding/pointer-cancellation.html",
       "coverage_classification": "manual_evaluation_required",
-      "automated_check_exists": false,
+      "questionnaire_question_ids": [
+        "pointer.cancellation"
+      ],
       "axe_check_exists": false,
       "keyboard_focus_check_exists": false,
       "keyboard_focus_checks": [],
       "text_reflow_check_exists": false,
       "text_reflow_checks": [],
+      "text_spacing_check_exists": false,
+      "text_spacing_checks": [],
+      "orientation_check_exists": false,
+      "orientation_checks": [],
+      "non_text_contrast_check_exists": false,
+      "non_text_contrast_checks": [],
+      "hover_focus_content_check_exists": false,
+      "hover_focus_content_checks": [],
+      "target_size_check_exists": false,
+      "target_size_checks": [],
       "axe_criterion_tag": "wcag252",
       "axe_rules": [],
+      "automated_check_exists": false,
       "failure_patterns": [],
       "limitations": [
         "No enabled axe rule selected by the current scanner carries this criterion's exact WCAG tag.",
@@ -2417,12 +2936,24 @@
       "criterion_url": "https://www.w3.org/TR/WCAG22/#label-in-name",
       "understanding_url": "https://www.w3.org/WAI/WCAG22/Understanding/label-in-name.html",
       "coverage_classification": "partial",
-      "automated_check_exists": true,
+      "questionnaire_question_ids": [
+        "widgets.label_in_accessible_name"
+      ],
       "axe_check_exists": true,
       "keyboard_focus_check_exists": false,
       "keyboard_focus_checks": [],
       "text_reflow_check_exists": false,
       "text_reflow_checks": [],
+      "text_spacing_check_exists": false,
+      "text_spacing_checks": [],
+      "orientation_check_exists": false,
+      "orientation_checks": [],
+      "non_text_contrast_check_exists": false,
+      "non_text_contrast_checks": [],
+      "hover_focus_content_check_exists": false,
+      "hover_focus_content_checks": [],
+      "target_size_check_exists": false,
+      "target_size_checks": [],
       "axe_criterion_tag": "wcag253",
       "axe_rules": [
         {
@@ -2443,6 +2974,7 @@
           "help_url": "https://dequeuniversity.com/rules/axe/4.14/label-content-name-mismatch?application=axeAPI"
         }
       ],
+      "automated_check_exists": true,
       "failure_patterns": [
         {
           "rule_id": "label-content-name-mismatch",
@@ -2479,14 +3011,27 @@
       "criterion_url": "https://www.w3.org/TR/WCAG22/#motion-actuation",
       "understanding_url": "https://www.w3.org/WAI/WCAG22/Understanding/motion-actuation.html",
       "coverage_classification": "manual_evaluation_required",
-      "automated_check_exists": false,
+      "questionnaire_question_ids": [
+        "motion.actuation_alternative"
+      ],
       "axe_check_exists": false,
       "keyboard_focus_check_exists": false,
       "keyboard_focus_checks": [],
       "text_reflow_check_exists": false,
       "text_reflow_checks": [],
+      "text_spacing_check_exists": false,
+      "text_spacing_checks": [],
+      "orientation_check_exists": false,
+      "orientation_checks": [],
+      "non_text_contrast_check_exists": false,
+      "non_text_contrast_checks": [],
+      "hover_focus_content_check_exists": false,
+      "hover_focus_content_checks": [],
+      "target_size_check_exists": false,
+      "target_size_checks": [],
       "axe_criterion_tag": "wcag254",
       "axe_rules": [],
+      "automated_check_exists": false,
       "failure_patterns": [],
       "limitations": [
         "No enabled axe rule selected by the current scanner carries this criterion's exact WCAG tag.",
@@ -2517,14 +3062,27 @@
       "criterion_url": "https://www.w3.org/TR/WCAG22/#dragging-movements",
       "understanding_url": "https://www.w3.org/WAI/WCAG22/Understanding/dragging-movements.html",
       "coverage_classification": "manual_evaluation_required",
-      "automated_check_exists": false,
+      "questionnaire_question_ids": [
+        "dragging.alternative"
+      ],
       "axe_check_exists": false,
       "keyboard_focus_check_exists": false,
       "keyboard_focus_checks": [],
       "text_reflow_check_exists": false,
       "text_reflow_checks": [],
+      "text_spacing_check_exists": false,
+      "text_spacing_checks": [],
+      "orientation_check_exists": false,
+      "orientation_checks": [],
+      "non_text_contrast_check_exists": false,
+      "non_text_contrast_checks": [],
+      "hover_focus_content_check_exists": false,
+      "hover_focus_content_checks": [],
+      "target_size_check_exists": false,
+      "target_size_checks": [],
       "axe_criterion_tag": "wcag257",
       "axe_rules": [],
+      "automated_check_exists": false,
       "failure_patterns": [],
       "limitations": [
         "No enabled axe rule selected by the current scanner carries this criterion's exact WCAG tag.",
@@ -2554,13 +3112,28 @@
       "anchor": "target-size-minimum",
       "criterion_url": "https://www.w3.org/TR/WCAG22/#target-size-minimum",
       "understanding_url": "https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html",
-      "coverage_classification": "not_implemented",
-      "automated_check_exists": false,
+      "coverage_classification": "partial",
+      "questionnaire_question_ids": [
+        "controls.target_size_context",
+        "widgets.target_size_exceptions"
+      ],
       "axe_check_exists": false,
       "keyboard_focus_check_exists": false,
       "keyboard_focus_checks": [],
       "text_reflow_check_exists": false,
       "text_reflow_checks": [],
+      "text_spacing_check_exists": false,
+      "text_spacing_checks": [],
+      "orientation_check_exists": false,
+      "orientation_checks": [],
+      "non_text_contrast_check_exists": false,
+      "non_text_contrast_checks": [],
+      "hover_focus_content_check_exists": false,
+      "hover_focus_content_checks": [],
+      "target_size_check_exists": true,
+      "target_size_checks": [
+        "Measures visible, enabled pointer-target bounding boxes and reports targets narrower or shorter than 24 CSS px for review; WCAG exceptions and actual target spacing are not evaluated."
+      ],
       "axe_criterion_tag": "wcag258",
       "axe_rules": [
         {
@@ -2579,9 +3152,10 @@
           "help_url": "https://dequeuniversity.com/rules/axe/4.14/target-size?application=axeAPI"
         }
       ],
+      "automated_check_exists": true,
       "failure_patterns": [],
       "limitations": [
-        "No enabled axe rule selected by the current scanner carries this criterion's exact WCAG tag.",
+        "No enabled axe rule selected by the current scanner carries this criterion's exact WCAG tag; the listed WebAble probes are separate, bounded evidence and do not establish criterion conformance.",
         "A WCAG tag records the axe rule author's criterion association; it is not evidence that the rule covers the full success criterion.",
         "The scanner records rule outcomes only when the rule runs and reports them. An absent result does not establish that the criterion passed."
       ],
@@ -2593,9 +3167,12 @@
         "https://www.w3.org/TR/WCAG22/#target-size-minimum",
         "https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html"
       ],
-      "relevant_tests": [],
+      "relevant_tests": [
+        "tests/test_capture.py::test_target_size_audit_reports_small_visible_target_for_review",
+        "tests/test_capture.py::test_target_size_audit_does_not_flag_adequate_target"
+      ],
       "outstanding_gaps": [
-        "Design and validate a criterion-specific check or interaction scenario before adding automated coverage; do not infer a pass from the absence of an axe mapping.",
+        "Validate the implemented checks with criterion-specific counterexamples against the criterion's Understanding guidance; retain manual review for aspects beyond their bounded scope.",
         "No result from this scan may be described as WCAG conformance."
       ]
     },
@@ -2609,12 +3186,24 @@
       "criterion_url": "https://www.w3.org/TR/WCAG22/#language-of-page",
       "understanding_url": "https://www.w3.org/WAI/WCAG22/Understanding/language-of-page.html",
       "coverage_classification": "partial",
-      "automated_check_exists": true,
+      "questionnaire_question_ids": [
+        "language.parts"
+      ],
       "axe_check_exists": true,
       "keyboard_focus_check_exists": false,
       "keyboard_focus_checks": [],
       "text_reflow_check_exists": false,
       "text_reflow_checks": [],
+      "text_spacing_check_exists": false,
+      "text_spacing_checks": [],
+      "orientation_check_exists": false,
+      "orientation_checks": [],
+      "non_text_contrast_check_exists": false,
+      "non_text_contrast_checks": [],
+      "hover_focus_content_check_exists": false,
+      "hover_focus_content_checks": [],
+      "target_size_check_exists": false,
+      "target_size_checks": [],
       "axe_criterion_tag": "wcag311",
       "axe_rules": [
         {
@@ -2676,6 +3265,7 @@
           "help_url": "https://dequeuniversity.com/rules/axe/4.14/html-xml-lang-mismatch?application=axeAPI"
         }
       ],
+      "automated_check_exists": true,
       "failure_patterns": [
         {
           "rule_id": "html-has-lang",
@@ -2724,12 +3314,24 @@
       "criterion_url": "https://www.w3.org/TR/WCAG22/#language-of-parts",
       "understanding_url": "https://www.w3.org/WAI/WCAG22/Understanding/language-of-parts.html",
       "coverage_classification": "partial",
-      "automated_check_exists": true,
+      "questionnaire_question_ids": [
+        "language.parts"
+      ],
       "axe_check_exists": true,
       "keyboard_focus_check_exists": false,
       "keyboard_focus_checks": [],
       "text_reflow_check_exists": false,
       "text_reflow_checks": [],
+      "text_spacing_check_exists": false,
+      "text_spacing_checks": [],
+      "orientation_check_exists": false,
+      "orientation_checks": [],
+      "non_text_contrast_check_exists": false,
+      "non_text_contrast_checks": [],
+      "hover_focus_content_check_exists": false,
+      "hover_focus_content_checks": [],
+      "target_size_check_exists": false,
+      "target_size_checks": [],
       "axe_criterion_tag": "wcag312",
       "axe_rules": [
         {
@@ -2753,6 +3355,7 @@
           "help_url": "https://dequeuniversity.com/rules/axe/4.14/valid-lang?application=axeAPI"
         }
       ],
+      "automated_check_exists": true,
       "failure_patterns": [
         {
           "rule_id": "valid-lang",
@@ -2789,14 +3392,27 @@
       "criterion_url": "https://www.w3.org/TR/WCAG22/#on-focus",
       "understanding_url": "https://www.w3.org/WAI/WCAG22/Understanding/on-focus.html",
       "coverage_classification": "manual_evaluation_required",
-      "automated_check_exists": false,
+      "questionnaire_question_ids": [
+        "widgets.no_unexpected_change_on_focus"
+      ],
       "axe_check_exists": false,
       "keyboard_focus_check_exists": false,
       "keyboard_focus_checks": [],
       "text_reflow_check_exists": false,
       "text_reflow_checks": [],
+      "text_spacing_check_exists": false,
+      "text_spacing_checks": [],
+      "orientation_check_exists": false,
+      "orientation_checks": [],
+      "non_text_contrast_check_exists": false,
+      "non_text_contrast_checks": [],
+      "hover_focus_content_check_exists": false,
+      "hover_focus_content_checks": [],
+      "target_size_check_exists": false,
+      "target_size_checks": [],
       "axe_criterion_tag": "wcag321",
       "axe_rules": [],
+      "automated_check_exists": false,
       "failure_patterns": [],
       "limitations": [
         "No enabled axe rule selected by the current scanner carries this criterion's exact WCAG tag.",
@@ -2827,14 +3443,27 @@
       "criterion_url": "https://www.w3.org/TR/WCAG22/#on-input",
       "understanding_url": "https://www.w3.org/WAI/WCAG22/Understanding/on-input.html",
       "coverage_classification": "manual_evaluation_required",
-      "automated_check_exists": false,
+      "questionnaire_question_ids": [
+        "forms.no_unexpected_change_on_input"
+      ],
       "axe_check_exists": false,
       "keyboard_focus_check_exists": false,
       "keyboard_focus_checks": [],
       "text_reflow_check_exists": false,
       "text_reflow_checks": [],
+      "text_spacing_check_exists": false,
+      "text_spacing_checks": [],
+      "orientation_check_exists": false,
+      "orientation_checks": [],
+      "non_text_contrast_check_exists": false,
+      "non_text_contrast_checks": [],
+      "hover_focus_content_check_exists": false,
+      "hover_focus_content_checks": [],
+      "target_size_check_exists": false,
+      "target_size_checks": [],
       "axe_criterion_tag": "wcag322",
       "axe_rules": [],
+      "automated_check_exists": false,
       "failure_patterns": [],
       "limitations": [
         "No enabled axe rule selected by the current scanner carries this criterion's exact WCAG tag.",
@@ -2865,14 +3494,27 @@
       "criterion_url": "https://www.w3.org/TR/WCAG22/#consistent-navigation",
       "understanding_url": "https://www.w3.org/WAI/WCAG22/Understanding/consistent-navigation.html",
       "coverage_classification": "manual_evaluation_required",
-      "automated_check_exists": false,
+      "questionnaire_question_ids": [
+        "pages.consistent_navigation_order"
+      ],
       "axe_check_exists": false,
       "keyboard_focus_check_exists": false,
       "keyboard_focus_checks": [],
       "text_reflow_check_exists": false,
       "text_reflow_checks": [],
+      "text_spacing_check_exists": false,
+      "text_spacing_checks": [],
+      "orientation_check_exists": false,
+      "orientation_checks": [],
+      "non_text_contrast_check_exists": false,
+      "non_text_contrast_checks": [],
+      "hover_focus_content_check_exists": false,
+      "hover_focus_content_checks": [],
+      "target_size_check_exists": false,
+      "target_size_checks": [],
       "axe_criterion_tag": "wcag323",
       "axe_rules": [],
+      "automated_check_exists": false,
       "failure_patterns": [],
       "limitations": [
         "No enabled axe rule selected by the current scanner carries this criterion's exact WCAG tag.",
@@ -2903,14 +3545,27 @@
       "criterion_url": "https://www.w3.org/TR/WCAG22/#consistent-identification",
       "understanding_url": "https://www.w3.org/WAI/WCAG22/Understanding/consistent-identification.html",
       "coverage_classification": "manual_evaluation_required",
-      "automated_check_exists": false,
+      "questionnaire_question_ids": [
+        "pages.consistent_identification"
+      ],
       "axe_check_exists": false,
       "keyboard_focus_check_exists": false,
       "keyboard_focus_checks": [],
       "text_reflow_check_exists": false,
       "text_reflow_checks": [],
+      "text_spacing_check_exists": false,
+      "text_spacing_checks": [],
+      "orientation_check_exists": false,
+      "orientation_checks": [],
+      "non_text_contrast_check_exists": false,
+      "non_text_contrast_checks": [],
+      "hover_focus_content_check_exists": false,
+      "hover_focus_content_checks": [],
+      "target_size_check_exists": false,
+      "target_size_checks": [],
       "axe_criterion_tag": "wcag324",
       "axe_rules": [],
+      "automated_check_exists": false,
       "failure_patterns": [],
       "limitations": [
         "No enabled axe rule selected by the current scanner carries this criterion's exact WCAG tag.",
@@ -2941,14 +3596,27 @@
       "criterion_url": "https://www.w3.org/TR/WCAG22/#consistent-help",
       "understanding_url": "https://www.w3.org/WAI/WCAG22/Understanding/consistent-help.html",
       "coverage_classification": "manual_evaluation_required",
-      "automated_check_exists": false,
+      "questionnaire_question_ids": [
+        "pages.consistent_help_location"
+      ],
       "axe_check_exists": false,
       "keyboard_focus_check_exists": false,
       "keyboard_focus_checks": [],
       "text_reflow_check_exists": false,
       "text_reflow_checks": [],
+      "text_spacing_check_exists": false,
+      "text_spacing_checks": [],
+      "orientation_check_exists": false,
+      "orientation_checks": [],
+      "non_text_contrast_check_exists": false,
+      "non_text_contrast_checks": [],
+      "hover_focus_content_check_exists": false,
+      "hover_focus_content_checks": [],
+      "target_size_check_exists": false,
+      "target_size_checks": [],
       "axe_criterion_tag": "wcag326",
       "axe_rules": [],
+      "automated_check_exists": false,
       "failure_patterns": [],
       "limitations": [
         "No enabled axe rule selected by the current scanner carries this criterion's exact WCAG tag.",
@@ -2979,14 +3647,27 @@
       "criterion_url": "https://www.w3.org/TR/WCAG22/#error-identification",
       "understanding_url": "https://www.w3.org/WAI/WCAG22/Understanding/error-identification.html",
       "coverage_classification": "manual_evaluation_required",
-      "automated_check_exists": false,
+      "questionnaire_question_ids": [
+        "forms.error_identification"
+      ],
       "axe_check_exists": false,
       "keyboard_focus_check_exists": false,
       "keyboard_focus_checks": [],
       "text_reflow_check_exists": false,
       "text_reflow_checks": [],
+      "text_spacing_check_exists": false,
+      "text_spacing_checks": [],
+      "orientation_check_exists": false,
+      "orientation_checks": [],
+      "non_text_contrast_check_exists": false,
+      "non_text_contrast_checks": [],
+      "hover_focus_content_check_exists": false,
+      "hover_focus_content_checks": [],
+      "target_size_check_exists": false,
+      "target_size_checks": [],
       "axe_criterion_tag": "wcag331",
       "axe_rules": [],
+      "automated_check_exists": false,
       "failure_patterns": [],
       "limitations": [
         "No enabled axe rule selected by the current scanner carries this criterion's exact WCAG tag.",
@@ -3017,12 +3698,24 @@
       "criterion_url": "https://www.w3.org/TR/WCAG22/#labels-or-instructions",
       "understanding_url": "https://www.w3.org/WAI/WCAG22/Understanding/labels-or-instructions.html",
       "coverage_classification": "partial",
-      "automated_check_exists": true,
+      "questionnaire_question_ids": [
+        "forms.labels_and_instructions"
+      ],
       "axe_check_exists": true,
       "keyboard_focus_check_exists": false,
       "keyboard_focus_checks": [],
       "text_reflow_check_exists": false,
       "text_reflow_checks": [],
+      "text_spacing_check_exists": false,
+      "text_spacing_checks": [],
+      "orientation_check_exists": false,
+      "orientation_checks": [],
+      "non_text_contrast_check_exists": false,
+      "non_text_contrast_checks": [],
+      "hover_focus_content_check_exists": false,
+      "hover_focus_content_checks": [],
+      "target_size_check_exists": false,
+      "target_size_checks": [],
       "axe_criterion_tag": "wcag332",
       "axe_rules": [
         {
@@ -3045,6 +3738,7 @@
           "help_url": "https://dequeuniversity.com/rules/axe/4.14/form-field-multiple-labels?application=axeAPI"
         }
       ],
+      "automated_check_exists": true,
       "failure_patterns": [
         {
           "rule_id": "form-field-multiple-labels",
@@ -3081,14 +3775,27 @@
       "criterion_url": "https://www.w3.org/TR/WCAG22/#error-suggestion",
       "understanding_url": "https://www.w3.org/WAI/WCAG22/Understanding/error-suggestion.html",
       "coverage_classification": "manual_evaluation_required",
-      "automated_check_exists": false,
+      "questionnaire_question_ids": [
+        "forms.error_suggestions"
+      ],
       "axe_check_exists": false,
       "keyboard_focus_check_exists": false,
       "keyboard_focus_checks": [],
       "text_reflow_check_exists": false,
       "text_reflow_checks": [],
+      "text_spacing_check_exists": false,
+      "text_spacing_checks": [],
+      "orientation_check_exists": false,
+      "orientation_checks": [],
+      "non_text_contrast_check_exists": false,
+      "non_text_contrast_checks": [],
+      "hover_focus_content_check_exists": false,
+      "hover_focus_content_checks": [],
+      "target_size_check_exists": false,
+      "target_size_checks": [],
       "axe_criterion_tag": "wcag333",
       "axe_rules": [],
+      "automated_check_exists": false,
       "failure_patterns": [],
       "limitations": [
         "No enabled axe rule selected by the current scanner carries this criterion's exact WCAG tag.",
@@ -3119,14 +3826,27 @@
       "criterion_url": "https://www.w3.org/TR/WCAG22/#error-prevention-legal-financial-data",
       "understanding_url": "https://www.w3.org/WAI/WCAG22/Understanding/error-prevention-legal-financial-data.html",
       "coverage_classification": "manual_evaluation_required",
-      "automated_check_exists": false,
+      "questionnaire_question_ids": [
+        "transactions.error_prevention"
+      ],
       "axe_check_exists": false,
       "keyboard_focus_check_exists": false,
       "keyboard_focus_checks": [],
       "text_reflow_check_exists": false,
       "text_reflow_checks": [],
+      "text_spacing_check_exists": false,
+      "text_spacing_checks": [],
+      "orientation_check_exists": false,
+      "orientation_checks": [],
+      "non_text_contrast_check_exists": false,
+      "non_text_contrast_checks": [],
+      "hover_focus_content_check_exists": false,
+      "hover_focus_content_checks": [],
+      "target_size_check_exists": false,
+      "target_size_checks": [],
       "axe_criterion_tag": "wcag334",
       "axe_rules": [],
+      "automated_check_exists": false,
       "failure_patterns": [],
       "limitations": [
         "No enabled axe rule selected by the current scanner carries this criterion's exact WCAG tag.",
@@ -3157,14 +3877,27 @@
       "criterion_url": "https://www.w3.org/TR/WCAG22/#redundant-entry",
       "understanding_url": "https://www.w3.org/WAI/WCAG22/Understanding/redundant-entry.html",
       "coverage_classification": "manual_evaluation_required",
-      "automated_check_exists": false,
+      "questionnaire_question_ids": [
+        "forms.repeated_entry"
+      ],
       "axe_check_exists": false,
       "keyboard_focus_check_exists": false,
       "keyboard_focus_checks": [],
       "text_reflow_check_exists": false,
       "text_reflow_checks": [],
+      "text_spacing_check_exists": false,
+      "text_spacing_checks": [],
+      "orientation_check_exists": false,
+      "orientation_checks": [],
+      "non_text_contrast_check_exists": false,
+      "non_text_contrast_checks": [],
+      "hover_focus_content_check_exists": false,
+      "hover_focus_content_checks": [],
+      "target_size_check_exists": false,
+      "target_size_checks": [],
       "axe_criterion_tag": "wcag337",
       "axe_rules": [],
+      "automated_check_exists": false,
       "failure_patterns": [],
       "limitations": [
         "No enabled axe rule selected by the current scanner carries this criterion's exact WCAG tag.",
@@ -3195,14 +3928,27 @@
       "criterion_url": "https://www.w3.org/TR/WCAG22/#accessible-authentication-minimum",
       "understanding_url": "https://www.w3.org/WAI/WCAG22/Understanding/accessible-authentication-minimum.html",
       "coverage_classification": "manual_evaluation_required",
-      "automated_check_exists": false,
+      "questionnaire_question_ids": [
+        "authentication.cognitive_steps"
+      ],
       "axe_check_exists": false,
       "keyboard_focus_check_exists": false,
       "keyboard_focus_checks": [],
       "text_reflow_check_exists": false,
       "text_reflow_checks": [],
+      "text_spacing_check_exists": false,
+      "text_spacing_checks": [],
+      "orientation_check_exists": false,
+      "orientation_checks": [],
+      "non_text_contrast_check_exists": false,
+      "non_text_contrast_checks": [],
+      "hover_focus_content_check_exists": false,
+      "hover_focus_content_checks": [],
+      "target_size_check_exists": false,
+      "target_size_checks": [],
       "axe_criterion_tag": "wcag338",
       "axe_rules": [],
+      "automated_check_exists": false,
       "failure_patterns": [],
       "limitations": [
         "No enabled axe rule selected by the current scanner carries this criterion's exact WCAG tag.",
@@ -3233,12 +3979,24 @@
       "criterion_url": "https://www.w3.org/TR/WCAG22/#name-role-value",
       "understanding_url": "https://www.w3.org/WAI/WCAG22/Understanding/name-role-value.html",
       "coverage_classification": "partial",
-      "automated_check_exists": true,
+      "questionnaire_question_ids": [
+        "widgets.accessible_name_role_state"
+      ],
       "axe_check_exists": true,
       "keyboard_focus_check_exists": false,
       "keyboard_focus_checks": [],
       "text_reflow_check_exists": false,
       "text_reflow_checks": [],
+      "text_spacing_check_exists": false,
+      "text_spacing_checks": [],
+      "orientation_check_exists": false,
+      "orientation_checks": [],
+      "non_text_contrast_check_exists": false,
+      "non_text_contrast_checks": [],
+      "hover_focus_content_check_exists": false,
+      "hover_focus_content_checks": [],
+      "target_size_check_exists": false,
+      "target_size_checks": [],
       "axe_criterion_tag": "wcag412",
       "axe_rules": [
         {
@@ -3797,6 +4555,7 @@
           "help_url": "https://dequeuniversity.com/rules/axe/4.14/summary-name?application=axeAPI"
         }
       ],
+      "automated_check_exists": true,
       "failure_patterns": [
         {
           "rule_id": "area-alt",
@@ -3997,14 +4756,27 @@
       "criterion_url": "https://www.w3.org/TR/WCAG22/#status-messages",
       "understanding_url": "https://www.w3.org/WAI/WCAG22/Understanding/status-messages.html",
       "coverage_classification": "manual_evaluation_required",
-      "automated_check_exists": false,
+      "questionnaire_question_ids": [
+        "widgets.status_messages"
+      ],
       "axe_check_exists": false,
       "keyboard_focus_check_exists": false,
       "keyboard_focus_checks": [],
       "text_reflow_check_exists": false,
       "text_reflow_checks": [],
+      "text_spacing_check_exists": false,
+      "text_spacing_checks": [],
+      "orientation_check_exists": false,
+      "orientation_checks": [],
+      "non_text_contrast_check_exists": false,
+      "non_text_contrast_checks": [],
+      "hover_focus_content_check_exists": false,
+      "hover_focus_content_checks": [],
+      "target_size_check_exists": false,
+      "target_size_checks": [],
       "axe_criterion_tag": "wcag413",
       "axe_rules": [],
+      "automated_check_exists": false,
       "failure_patterns": [],
       "limitations": [
         "No enabled axe rule selected by the current scanner carries this criterion's exact WCAG tag.",

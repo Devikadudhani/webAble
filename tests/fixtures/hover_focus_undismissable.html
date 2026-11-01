@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Focus content obscures page</title>
+  <style>
+    body { font: 16px sans-serif; }
+    #dialog {
+      display: none;
+      position: fixed;
+      z-index: 10;
+      inset: 0;
+      padding: 48px;
+      background: rgba(0, 0, 0, .9);
+      color: white;
+    }
+    #trigger:focus + #dialog { display: block; }
+  </style>
+</head>
+<body>
+  <button id="trigger">More information</button>
+  <div id="dialog" role="dialog" aria-label="More information" tabindex="-1">
+    <p>The focused content covers the page and Escape does not dismiss it.</p>
+  </div>
+  <main>
+    <p id="underlying">Underlying page content is obscured by the fixed panel.</p>
+    <button id="underlying-action">Continue</button>
+  </main>
+  <script>
+    document.addEventListener("keydown", event => {
+      if (event.key === "Escape") event.preventDefault();
+    });
+  </script>
+</body>
+</html>

@@ -22,6 +22,10 @@ from app.analyzers.functional_ux import (
     FunctionalUXAuditResult,
     audit_functional_ux,
 )
+from app.analyzers.hybrid_evaluation import (
+    BrowserFeatureDiscovery,
+    discover_browser_features,
+)
 from app.analyzers.keyboard_focus import (
     KeyboardFocusAuditResult,
     audit_keyboard_focus,
@@ -31,6 +35,7 @@ from app.analyzers.text_reflow import (
     TextReflowAuditResult,
     audit_text_reflow,
 )
+from app.analyzers.target_size import TargetSizeAuditResult, audit_target_size
 from app.analyzers.horizontal_overflow import (
     HorizontalOverflowResult,
     analyze_horizontal_overflow,
@@ -118,6 +123,18 @@ class ViewportCaptureResult:
             details=["Text scaling and reflow audit was not attempted."],
         )
     )
+    target_size_audit: TargetSizeAuditResult = field(
+        default_factory=lambda: TargetSizeAuditResult(
+            status="not_tested",
+            details=["Target-size audit was not attempted."],
+        )
+    )
+    browser_feature_discovery: BrowserFeatureDiscovery = field(
+        default_factory=lambda: BrowserFeatureDiscovery(
+            status="not_attempted",
+            details=("Browser feature discovery was not attempted.",),
+        )
+    )
 
 
 VIEWPORTS = (
@@ -180,13 +197,25 @@ async def capture_responsive_viewports(
             status="not_tested",
             details=["Keyboard/focus audit was not attempted because capture was incomplete."],
         )
+        target_size = TargetSizeAuditResult(
+            status="not_tested",
+            details=["Target-size audit was not attempted because capture was incomplete."],
+        )
+        feature_discovery = BrowserFeatureDiscovery(
+            status="not_attempted",
+            details=("Browser feature discovery was not attempted because capture was incomplete.",),
+        )
         text_reflow = TextReflowAuditResult(
             status="not_tested",
             details=["Text scaling and reflow audit was not attempted because capture was incomplete."],
         )
 
         async def diagnose_live_page(page: PageEvaluator) -> None:
-            nonlocal diagnosis, functional_audit, accessibility, keyboard_focus, text_reflow
+            nonlocal diagnosis, functional_audit, accessibility, keyboard_focus, text_reflow, target_size, feature_discovery
+            feature_discovery = await discover_browser_features(
+                page,
+                viewport=name,
+            )
             try:
                 findings = await diagnoser(page, viewport.width)
             except Exception as error:
@@ -244,6 +273,7 @@ async def capture_responsive_viewports(
                         f"Keyboard/focus audit failed ({type(error).__name__})."
                     ],
                 )
+            target_size = await audit_target_size(page)
             try:
                 text_reflow = await audit_text_reflow(
                     page,
@@ -367,6 +397,12 @@ async def capture_responsive_viewports(
                     "Keyboard/focus audit was not attempted because capture was incomplete."
                 ],
             )
+            target_size = TargetSizeAuditResult(
+                status="not_tested",
+                details=[
+                    "Target-size audit was not attempted because capture was incomplete."
+                ],
+            )
             text_reflow = TextReflowAuditResult(
                 status="not_tested",
                 details=["Text scaling and reflow audit was not attempted because capture was incomplete."],
@@ -433,6 +469,8 @@ async def capture_responsive_viewports(
                 accessibility_scan=accessibility,
                 keyboard_focus_audit=keyboard_focus,
                 text_reflow_audit=text_reflow,
+                target_size_audit=target_size,
+                browser_feature_discovery=feature_discovery,
             )
         )
 

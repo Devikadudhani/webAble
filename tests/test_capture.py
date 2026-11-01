@@ -62,11 +62,22 @@ class FixtureHandler(BaseHTTPRequestHandler):
             "/blocked-resource": "blocked_resource.html",
             "/functional-ux": "functional_ux.html",
             "/accessibility": "accessibility.html",
+            "/non-text-contrast": "non_text_contrast.html",
+            "/non-text-contrast-adequate": "non_text_contrast_adequate.html",
+            "/target-size-small": "target_size_small.html",
+            "/target-size-adequate": "target_size_adequate.html",
             "/keyboard-visible": "keyboard_focus_visible.html",
             "/keyboard-absent": "keyboard_focus_absent.html",
             "/keyboard-skipped": "keyboard_focus_skipped.html",
             "/keyboard-trap": "keyboard_focus_trap.html",
+            "/keyboard-one-way-block": "keyboard_focus_one_way_block.html",
+            "/keyboard-many-controls": "keyboard_focus_many_controls.html",
+            "/keyboard-wrapping-cycle": "keyboard_focus_wrapping_cycle.html",
             "/keyboard-overlay": "keyboard_focus_overlay.html",
+            "/keyboard-overlay-opaque": "keyboard_focus_overlay_opaque.html",
+            "/keyboard-dialog": "keyboard_focus_dialog.html",
+            "/keyboard-sticky-partial": "keyboard_focus_sticky_partial.html",
+            "/keyboard-unobscured": "keyboard_focus_unobscured.html",
             "/keyboard-none": "keyboard_focus_none.html",
             "/keyboard-unsafe": "keyboard_focus_unsafe.html",
             "/keyboard-edge-cases": "keyboard_focus_edge_cases.html",
@@ -79,6 +90,18 @@ class FixtureHandler(BaseHTTPRequestHandler):
             "/text-reflow-dynamic": "text_reflow_dynamic.html",
             "/text-reflow-review": "text_reflow_review.html",
             "/text-reflow-responsive": "text_reflow_responsive.html",
+            "/text-spacing-usable": "text_spacing_usable.html",
+            "/text-spacing-clipped": "text_spacing_clipped.html",
+            "/text-spacing-overlap": "text_spacing_overlap.html",
+            "/text-spacing-control": "text_spacing_control.html",
+            "/text-spacing-obscured-control": "text_spacing_obscured_control.html",
+            "/text-spacing-scrollable": "text_spacing_scrollable.html",
+            "/hover-focus-compliant": "hover_focus_compliant.html",
+            "/hover-focus-not-hoverable": "hover_focus_not_hoverable.html",
+            "/hover-focus-undismissable": "hover_focus_undismissable.html",
+            "/hover-focus-style-only": "hover_focus_style_only.html",
+            "/orientation-flexible": "orientation_flexible.html",
+            "/orientation-restricted": "orientation_restricted.html",
         }.get(path, "normal.html")
         body = (FIXTURES / fixture).read_bytes()
         self.send_response(200)
@@ -192,7 +215,27 @@ def test_capture_endpoint_returns_200_for_local_fixture(
     with TestClient(main.app) as client:
         response = client.post(
             "/captures",
-            json={"url": f"{fixture_server}/responsive-overflow"},
+            json={
+                "url": f"{fixture_server}/responsive-overflow",
+                "accessibility_context": {
+                    "representative_page_urls": [f"{fixture_server}/normal"],
+                    "user_journeys": [
+                        {
+                            "name": "Review a page",
+                            "page_urls": [f"{fixture_server}/normal"],
+                        }
+                    ],
+                    "feature_presence": {"forms": True},
+                    "feature_inventory_completed": True,
+                    "answers": [
+                        {
+                            "question_id": "forms.error_identification",
+                            "answer": "not_sure",
+                            "explanation": "Please review validation behavior.",
+                        }
+                    ],
+                },
+            },
         )
     assert response.status_code == 200
     viewports = response.json()["viewports"]
@@ -213,6 +256,29 @@ def test_capture_endpoint_returns_200_for_local_fixture(
     assert all(item["accessibility_scan"]["status"] == "available" for item in viewports)
     assert all(item["accessibility_scan"]["axe_version"] == "4.14.0" for item in viewports)
     assert all("text_reflow_audit" in item for item in viewports)
+    assert all(
+        next(
+            scenario for scenario in item["text_reflow_audit"]["scenarios"]
+            if scenario["scenario_id"] == "orientation"
+        )["criterion_ids"] == ["1.3.4"]
+        for item in viewports
+    )
+    assert all(
+        any(
+            scenario["scenario_id"] == "text_spacing"
+            and "1.4.12" in scenario["criterion_ids"]
+            for scenario in item["text_reflow_audit"]["scenarios"]
+        )
+        for item in viewports
+    )
+    assert all("target_size_audit" in item for item in viewports)
+    assert all(
+        item["browser_feature_discovery"]["status"] == "available"
+        for item in viewports
+    )
+    assert all(
+        item["target_size_audit"]["status"] == "available" for item in viewports
+    )
     assert all(
         next(
             scenario for scenario in item["text_reflow_audit"]["scenarios"]
@@ -250,6 +316,29 @@ def test_capture_endpoint_returns_200_for_local_fixture(
     assert [issue["selector"] for issue in audit_summary["issues"]] == [
         "#oversized"
     ]
+    hybrid_evaluation = response.json()["hybrid_evaluation"]
+    assert hybrid_evaluation["browser_discovery_status"] == "available"
+    assert len(hybrid_evaluation["criteria"]) == 55
+    assert any(
+        criterion["status"] == "browser_observed"
+        for criterion in hybrid_evaluation["criteria"]
+    )
+    assert all(
+        criterion["compliance_conclusion"] is None
+        for criterion in hybrid_evaluation["criteria"]
+    )
+    form_criterion = next(
+        criterion
+        for criterion in hybrid_evaluation["criteria"]
+        if criterion["criterion_id"] == "3.3.1"
+    )
+    assert form_criterion["status"] == "owner_reported"
+    assert form_criterion["manual_review_required"] is True
+    assert form_criterion["owner_reported"][0]["question_id"] == "forms.error_identification"
+    assert hybrid_evaluation["representative_page_urls"] == [
+        f"{fixture_server}/normal"
+    ]
+    assert hybrid_evaluation["user_journeys"][0]["name"] == "Review a page"
     assert len({item["screenshot_ref"] for item in viewports}) == 3
     for item in viewports:
         screenshot_path = tmp_path / item["screenshot_ref"]
@@ -265,6 +354,19 @@ def test_capture_endpoint_returns_200_for_local_fixture(
         assert finding["selector"] == "#oversized"
         assert finding["viewport_name"] == viewport["name"]
         assert finding["evidence_correlation"] == "direct_geometry_match"
+
+
+def test_accessibility_questionnaire_api_exposes_conditional_questions_and_feature_labels():
+    from app.main import app
+
+    with TestClient(app) as client:
+        response = client.get("/accessibility/questionnaire")
+    assert response.status_code == 200
+    payload = response.json()
+    assert "Do not submit passwords" in payload["safety_notice"]
+    assert "forms.error_identification" in {
+        question["question_id"] for question in payload["conditional_questions"]
+    }
 
 
 def test_playwright_reflow_failure_preserves_results_and_closes_contexts(
@@ -489,6 +591,7 @@ def test_accessibility_scan_preserves_axe_results_and_specific_evidence(
     assert result.inapplicable
     assert result.incomplete
     assert result.passes
+    assert result.non_text_contrast.status == "partial"
 
     violations = {rule.rule_id: rule for rule in result.violations}
     assert "label" in violations
@@ -525,6 +628,8 @@ def test_accessibility_scan_preserves_axe_results_and_specific_evidence(
         for rule in result.violations
         for node in rule.nodes
     )
+
+
     unlabeled_node = next(
         node
         for node in violations["label"].nodes
@@ -583,10 +688,130 @@ def test_accessibility_scan_preserves_axe_results_and_specific_evidence(
     ).model_dump()["viewports"][0]["accessibility_scan"]
     assert serialized["violations"][0]["nodes"][0]["target"]
     assert serialized["violations"][0]["tags"]
+    assert serialized["non_text_contrast"]["status"] == "partial"
     assert all(
         collection in serialized
         for collection in ("violations", "incomplete", "passes", "inapplicable")
     )
+    assert serialized["non_text_contrast"]["status"] == "partial"
+
+
+@pytest.mark.parametrize(
+    ("path", "expected_low_contrast"),
+    [
+        ("non-text-contrast", True),
+        ("non-text-contrast-adequate", False),
+    ],
+)
+def test_non_text_contrast_reports_solid_color_candidates_for_review(
+    capture, fixture_server, path, expected_low_contrast
+):
+    from app.analyzers.accessibility import scan_accessibility
+
+    scans = []
+
+    async def run_scan():
+        async def scan_live_page(page):
+            scans.append(await scan_accessibility(page))
+
+        return await capture.capture(
+            f"{fixture_server}/{path}",
+            800,
+            600,
+            page_callback=scan_live_page,
+        )
+
+    evidence = asyncio.run(run_scan())
+    assert evidence.outcome == "completed"
+    assert len(scans) == 1
+    result = scans[0]
+    audit = result.non_text_contrast
+
+    assert audit.status == "partial"
+    assert audit.inspected_components > 0
+    assert all(finding.classification == "needs_review" for finding in audit.findings)
+    assert all(
+        finding.potential_issue_detected
+        and not finding.confirmed_violation
+        and finding.manual_review_required
+        for finding in audit.findings
+    )
+    if expected_low_contrast:
+        findings = {finding.selector: finding for finding in audit.findings}
+        assert "#low-boundary" in findings
+        assert any(
+            pair["contrast_ratio"] < pair["required_ratio"]
+            for pair in findings["#low-boundary"].color_pairs
+        )
+        assert "#low-circle" in findings
+        assert findings["#low-circle"].color_pairs[0]["visual_part"] == "svg_fill"
+        assert "#high-boundary" not in findings
+        assert "#high-circle" not in findings
+        assert "#hidden-control" not in findings
+        assert audit.inspected_graphics == 2
+        assert any("were not pixel-sampled" in item for item in audit.details)
+        assert all(
+            finding.limitations for finding in audit.findings
+        )
+    else:
+        assert audit.findings == []
+        assert audit.inspected_graphics == 0
+        assert any("not a pass" in item for item in audit.details)
+
+
+def test_target_size_audit_reports_small_visible_target_for_review(
+    capture, fixture_server
+):
+    from app.analyzers.target_size import audit_target_size
+
+    scans = []
+
+    async def run_scan():
+        async def scan_live_page(page):
+            scans.append(await audit_target_size(page))
+
+        return await capture.capture(
+            f"{fixture_server}/target-size-small",
+            800,
+            600,
+            page_callback=scan_live_page,
+        )
+
+    evidence = asyncio.run(run_scan())
+    assert evidence.outcome == "completed"
+    assert scans[0].status == "available"
+    assert scans[0].inspected_targets == 2
+    assert [finding.selector for finding in scans[0].findings] == ["#small-target"]
+    finding = scans[0].findings[0]
+    assert finding.criterion_id == "2.5.8"
+    assert finding.width_css_px == 16
+    assert finding.height_css_px == 16
+    assert finding.accessible_name == "Small link"
+    assert finding.classification == "needs_review"
+    assert "exceptions are not evaluated" in scans[0].details[0]
+
+
+def test_target_size_audit_does_not_flag_adequate_target(capture, fixture_server):
+    from app.analyzers.target_size import audit_target_size
+
+    scans = []
+
+    async def run_scan():
+        async def scan_live_page(page):
+            scans.append(await audit_target_size(page))
+
+        return await capture.capture(
+            f"{fixture_server}/target-size-adequate",
+            800,
+            600,
+            page_callback=scan_live_page,
+        )
+
+    evidence = asyncio.run(run_scan())
+    assert evidence.outcome == "completed"
+    assert scans[0].status == "available"
+    assert scans[0].inspected_targets == 1
+    assert scans[0].findings == []
 
 
 def _run_keyboard_audit(fixture_server, path):
@@ -696,6 +921,385 @@ def test_text_reflow_reports_box_overlap_without_claiming_obscuration(fixture_se
     assert overlap.evidence["overlapHeight"] > 0
     assert "requires review" in overlap.observation
     assert all(finding.classification != "violation" for finding in scenario.findings)
+
+
+def _text_spacing_scenario(result):
+    return next(
+        scenario for scenario in result.scenarios
+        if scenario.scenario_id == "text_spacing"
+    )
+
+
+def test_text_spacing_usable_fixture_has_no_detected_geometry_issue(fixture_server):
+    scenario = _text_spacing_scenario(
+        _run_text_reflow_audit(fixture_server, "text-spacing-usable")
+    )
+
+    assert scenario.status == "completed"
+    assert scenario.criterion_ids == ["1.4.12"]
+    assert scenario.classification == "no_violation_detected"
+    assert scenario.findings == []
+    assert scenario.measurement.viewport_width == 1365
+
+
+def _hover_focus_scenario(result):
+    return next(
+        scenario for scenario in result.scenarios
+        if scenario.scenario_id == "hover_focus_content"
+    )
+
+
+def test_hover_focus_compliant_tooltip_records_behavior_and_restores_focus(
+    fixture_server,
+):
+    screenshot_calls = []
+
+    async def run():
+        async with async_playwright() as playwright:
+            browser = await playwright.chromium.launch()
+            try:
+                page = await browser.new_page(viewport={"width": 800, "height": 600})
+                await page.goto(
+                    f"{fixture_server}/hover-focus-compliant",
+                    wait_until="domcontentloaded",
+                )
+                await page.locator("#help").focus()
+
+                async def capture_visible_tooltip(
+                    screenshot_page, capture_id, viewport_name, scenario_id, width, height
+                ):
+                    screenshot_calls.append(
+                        (
+                            scenario_id,
+                            await screenshot_page.locator("#tip").is_visible(),
+                            width,
+                            height,
+                        )
+                    )
+                    return "hover-focus.png"
+
+                result = await audit_text_reflow(
+                    page,
+                    baseline_width=800,
+                    baseline_height=600,
+                    capture_screenshot=capture_visible_tooltip,
+                )
+                restored_focus = await page.evaluate(
+                    "() => document.activeElement?.id"
+                )
+                return result, restored_focus
+            finally:
+                await browser.close()
+
+    result, restored_focus = asyncio.run(run())
+    scenario = _hover_focus_scenario(result)
+    hover = next(
+        finding for finding in scenario.findings
+        if finding.evidence["interaction"] == "hover"
+    )
+    focus = next(
+        finding for finding in scenario.findings
+        if finding.evidence["interaction"] == "focus"
+    )
+
+    assert scenario.criterion_ids == ["1.4.13"]
+    assert scenario.classification == "needs_review"
+    assert hover.selector == "#help"
+    assert hover.evidence["content_selector"] == "#tip"
+    assert hover.evidence["pointer_entered_content_remained_visible"] is True
+    assert hover.evidence["visible_after_pointer_left_trigger_and_content"] is False
+    assert hover.evidence["escape_dismissed_content"] is True
+    assert hover.evidence["potential_issue_detected"] is False
+    assert hover.evidence["confirmed_violation"] is False
+    assert hover.evidence["manual_review_required"] is True
+    assert focus.evidence["escape_dismissed_content"] is True
+    assert hover.evidence["viewport"] == {"width": 800, "height": 600}
+    assert hover.evidence["content_geometry"]["width"] > 0
+    assert scenario.screenshot_ref == "hover-focus.png"
+    assert hover.screenshot_ref == "hover-focus.png"
+    assert (
+        "hover_focus_content",
+        True,
+        800,
+        600,
+    ) in screenshot_calls
+    assert restored_focus == "help"
+
+
+def test_hover_focus_reports_content_that_pointer_cannot_enter(fixture_server):
+    scenario = _hover_focus_scenario(
+        _run_text_reflow_audit(fixture_server, "hover-focus-not-hoverable")
+    )
+    hover = next(
+        finding for finding in scenario.findings
+        if finding.evidence["interaction"] == "hover"
+    )
+
+    assert scenario.classification == "needs_review"
+    assert hover.evidence["pointer_entered_content_remained_visible"] is False
+    assert hover.evidence["potential_issue_detected"] is True
+    assert hover.evidence["content_selector"] == "#tip"
+
+
+def test_hover_focus_reports_undismissable_overlapping_focus_content(fixture_server):
+    scenario = _hover_focus_scenario(
+        _run_text_reflow_audit(fixture_server, "hover-focus-undismissable")
+    )
+    focus = next(
+        finding for finding in scenario.findings
+        if finding.evidence["interaction"] == "focus"
+    )
+
+    assert scenario.classification == "needs_review"
+    assert focus.evidence["content_selector"] == "#dialog"
+    assert focus.evidence["potentially_overlapped_content"]
+    assert focus.evidence["dismissibility_required_by_overlap_heuristic"] is True
+    assert focus.evidence["escape_dismissed_content"] is False
+    assert focus.evidence["potential_issue_detected"] is True
+    assert focus.classification == "needs_review"
+
+
+def test_hover_focus_ignores_style_only_hover_changes(fixture_server):
+    scenario = _hover_focus_scenario(
+        _run_text_reflow_audit(fixture_server, "hover-focus-style-only")
+    )
+
+    assert scenario.status == "completed"
+    assert scenario.classification == "no_violation_detected"
+    assert scenario.findings == []
+    assert any("No new visible DOM content" in item for item in scenario.details)
+
+
+def _orientation_scenario(result):
+    return next(
+        scenario for scenario in result.scenarios
+        if scenario.scenario_id == "orientation"
+    )
+
+
+def test_orientation_flexible_fixture_preserves_content_and_restores_viewport(
+    fixture_server,
+):
+    async def run():
+        async with async_playwright() as playwright:
+            browser = await playwright.chromium.launch()
+            try:
+                page = await browser.new_page(viewport={"width": 390, "height": 844})
+                await page.goto(
+                    f"{fixture_server}/orientation-flexible",
+                    wait_until="domcontentloaded",
+                )
+                result = await audit_text_reflow(
+                    page, baseline_width=390, baseline_height=844
+                )
+                return result, page.viewport_size
+            finally:
+                await browser.close()
+
+    result, restored_viewport = asyncio.run(run())
+    scenario = _orientation_scenario(result)
+
+    assert scenario.status == "completed"
+    assert scenario.criterion_ids == ["1.3.4"]
+    assert scenario.classification == "no_violation_detected"
+    assert scenario.findings == []
+    assert scenario.baseline_measurement.viewport_width == 390
+    assert scenario.baseline_measurement.viewport_height == 844
+    assert scenario.measurement.viewport_width == 844
+    assert scenario.measurement.viewport_height == 390
+    assert restored_viewport == {"width": 390, "height": 844}
+    assert any("does not emulate physical device rotation" in item for item in scenario.details)
+
+
+def test_orientation_reports_content_and_control_changes_for_manual_review(
+    fixture_server,
+):
+    scenario = _orientation_scenario(
+        _run_text_reflow_audit(fixture_server, "orientation-restricted")
+    )
+    findings = {finding.selector: finding for finding in scenario.findings}
+
+    assert scenario.classification == "needs_review"
+    assert findings["#portrait-only"].evidence["orientation_change"] == (
+        "not_visible_in_landscape"
+    )
+    assert findings["#landscape-only"].evidence["orientation_change"] == (
+        "not_visible_in_portrait"
+    )
+    assert findings["#portrait-details"].evidence["orientation_change"] == (
+        "not_visible_in_landscape"
+    )
+    assert findings["#landscape-details"].evidence["orientation_change"] == (
+        "not_visible_in_portrait"
+    )
+    assert all(
+        finding.classification == "needs_review"
+        and finding.evidence["potential_issue_detected"] is True
+        and finding.evidence["confirmed_violation"] is False
+        and finding.evidence["manual_review_required"] is True
+        and finding.evidence["exception_essentiality_evaluated"] is False
+        for finding in scenario.findings
+    )
+
+
+def test_text_spacing_reports_fixed_height_clipping_for_review(fixture_server):
+    scenario = _text_spacing_scenario(
+        _run_text_reflow_audit(fixture_server, "text-spacing-clipped")
+    )
+    finding = next(
+        finding for finding in scenario.findings
+        if finding.selector == "#clipped"
+    )
+
+    assert scenario.classification == "needs_review"
+    assert finding.criterion_id == "1.4.12"
+    assert finding.classification == "needs_review"
+    assert "possible_text_clipping" in finding.evidence["observations"]
+    assert finding.evidence["viewport"] == {"width": 1365, "height": 768}
+    assert finding.evidence["geometry"]["height"] > 0
+    assert finding.evidence["applied_spacing"]["lineHeight"] == "24px"
+    assert finding.evidence["applied_spacing"]["letterSpacing"] == "1.92px"
+    assert finding.evidence["applied_spacing"]["wordSpacing"] == "2.56px"
+    assert finding.evidence["applied_spacing"]["paragraphSpacing"] == "32px"
+    assert finding.baseline_evidence["container_measurements"]["scrollHeight"] <= (
+        finding.baseline_evidence["container_measurements"]["clientHeight"] + 1
+    )
+
+
+def test_text_spacing_reports_new_overlap_without_claiming_violation(fixture_server):
+    scenario = _text_spacing_scenario(
+        _run_text_reflow_audit(fixture_server, "text-spacing-overlap")
+    )
+
+    assert scenario.classification == "needs_review"
+    overlap = next(
+        finding for finding in scenario.findings
+        if "overlap" in finding.observation
+    )
+    assert overlap.criterion_id == "1.4.12"
+    assert overlap.classification == "needs_review"
+    assert overlap.evidence["overlapHeight"] > 0
+    assert overlap.evidence["viewport"] == {"width": 1365, "height": 768}
+
+
+def test_text_spacing_reports_control_label_clipping_for_review(fixture_server):
+    scenario = _text_spacing_scenario(
+        _run_text_reflow_audit(fixture_server, "text-spacing-control")
+    )
+
+    assert scenario.classification == "needs_review"
+    finding = next(
+        finding for finding in scenario.findings
+        if finding.selector == "#submit"
+    )
+    assert "possible_text_clipping" in finding.evidence["observations"]
+    assert finding.evidence["geometry"]["width"] == 180
+    assert finding.classification == "needs_review"
+
+
+def test_text_spacing_reports_control_obscured_after_content_reflows(fixture_server):
+    scenario = _text_spacing_scenario(
+        _run_text_reflow_audit(
+            fixture_server, "text-spacing-obscured-control"
+        )
+    )
+    finding = next(
+        finding for finding in scenario.findings
+        if finding.selector == "#continue"
+    )
+
+    assert scenario.classification == "needs_review"
+    assert finding.observation.startswith("A control had more sampled hit-test")
+    assert finding.evidence["total_hit_samples"] > 0
+    assert finding.evidence["occluded_samples"] > 0
+    assert finding.evidence["viewport"] == {"width": 1365, "height": 768}
+    assert finding.evidence["geometry"]["width"] > 0
+
+
+def test_text_spacing_keeps_scrollable_region_as_review_not_failure(fixture_server):
+    scenario = _text_spacing_scenario(
+        _run_text_reflow_audit(fixture_server, "text-spacing-scrollable")
+    )
+
+    assert scenario.classification == "needs_review"
+    finding = next(
+        finding for finding in scenario.findings
+        if finding.selector == "#long-content"
+    )
+    assert finding.evidence["container_measurements"]["scrollContainer"] == (
+        "#scroll-region"
+    )
+    assert finding.classification == "needs_review"
+    assert "scrollable container" in " ".join(scenario.details)
+
+
+def test_text_spacing_overrides_restore_after_screenshot_failure(fixture_server):
+    async def run():
+        async with async_playwright() as playwright:
+            browser = await playwright.chromium.launch()
+            try:
+                page = await browser.new_page(viewport={"width": 800, "height": 600})
+                await page.goto(
+                    f"{fixture_server}/text-spacing-clipped",
+                    wait_until="domcontentloaded",
+                )
+                original = await page.locator("#clipped").evaluate(
+                    """element => ({
+                        lineHeight: element.style.getPropertyValue("line-height"),
+                        lineHeightPriority: element.style.getPropertyPriority("line-height"),
+                        marginBottom: element.style.getPropertyValue("margin-bottom"),
+                        marginBottomPriority: element.style.getPropertyPriority("margin-bottom"),
+                        letterSpacing: element.style.getPropertyValue("letter-spacing"),
+                        letterSpacingPriority: element.style.getPropertyPriority("letter-spacing"),
+                        wordSpacing: element.style.getPropertyValue("word-spacing"),
+                        wordSpacingPriority: element.style.getPropertyPriority("word-spacing")
+                    })"""
+                )
+
+                async def fail_screenshot(
+                    screenshot_page, *_args, **_kwargs
+                ):
+                    observed = await screenshot_page.locator("#clipped").evaluate(
+                        """element => ({
+                            lineHeight: getComputedStyle(element).lineHeight,
+                            letterSpacing: getComputedStyle(element).letterSpacing,
+                            wordSpacing: getComputedStyle(element).wordSpacing
+                        })"""
+                    )
+                    assert observed == {
+                        "lineHeight": "24px",
+                        "letterSpacing": "1.92px",
+                        "wordSpacing": "2.56px",
+                    }
+                    raise OSError("screenshot storage unavailable")
+
+                result = await audit_text_reflow(
+                    page,
+                    baseline_width=800,
+                    baseline_height=600,
+                    capture_screenshot=fail_screenshot,
+                )
+                restored = await page.locator("#clipped").evaluate(
+                    """element => ({
+                        lineHeight: element.style.getPropertyValue("line-height"),
+                        lineHeightPriority: element.style.getPropertyPriority("line-height"),
+                        marginBottom: element.style.getPropertyValue("margin-bottom"),
+                        marginBottomPriority: element.style.getPropertyPriority("margin-bottom"),
+                        letterSpacing: element.style.getPropertyValue("letter-spacing"),
+                        letterSpacingPriority: element.style.getPropertyPriority("letter-spacing"),
+                        wordSpacing: element.style.getPropertyValue("word-spacing"),
+                        wordSpacingPriority: element.style.getPropertyPriority("word-spacing")
+                    })"""
+                )
+                return result, original, restored
+            finally:
+                await browser.close()
+
+    result, original, restored = asyncio.run(run())
+    scenario = _text_spacing_scenario(result)
+    assert original == restored
+    assert any("screenshot capture failed" in item for item in scenario.details)
+    assert all(finding.classification == "needs_review" for finding in scenario.findings)
 
 
 def test_text_reflow_flags_320px_overflow_for_review(fixture_server):
@@ -1323,14 +1927,57 @@ def test_keyboard_audit_does_not_assume_candidate_count_proves_tab_order(
 
 def test_keyboard_audit_reports_potential_focus_trap_for_review(fixture_server):
     result = _run_keyboard_audit(fixture_server, "keyboard-trap")
+    trap = next(
+        check for check in result.checks if check.check_id == "keyboard_trap"
+    )
+
+    assert trap.status == "needs_review"
+    assert "possible keyboard trap" in trap.summary
+    assert trap.evidence[0]["tab_stalled_target"] == "#trapped"
+    assert trap.evidence[0]["shift_tab_focus_after_stall"] == "#trapped"
+    assert trap.evidence[0]["shift_tab_progress_observed"] is False
+    assert result.tab_actions <= 51
+    assert result.shift_tab_actions <= 2
+
+
+def test_keyboard_audit_distinguishes_one_way_tab_block_from_trap(fixture_server):
+    result = _run_keyboard_audit(fixture_server, "keyboard-one-way-block")
+    trap = next(
+        check for check in result.checks if check.check_id == "keyboard_trap"
+    )
+
+    assert trap.status == "needs_review"
+    assert "does not demonstrate a two-direction" in trap.summary
+    assert trap.evidence[0]["tab_stalled_target"] == "#blocked-forward"
+    assert trap.evidence[0]["shift_tab_progress_observed"] is True
+    assert trap.evidence[0]["shift_tab_focus_after_stall"] == "#before"
+
+
+def test_keyboard_audit_reports_wrapping_cycle_for_manual_review(fixture_server):
+    result = _run_keyboard_audit(fixture_server, "keyboard-wrapping-cycle")
+    trap = next(
+        check for check in result.checks if check.check_id == "keyboard_trap"
+    )
+
+    assert trap.status == "needs_review"
+    assert "intentional wrapping or a widget-level trap" in trap.summary
+    assert set(trap.evidence[0]["tab_cycle_selectors"]) == {
+        "#first-in-cycle",
+        "#second-in-cycle",
+    }
+    assert trap.evidence[0]["shift_tab_stayed_within_tab_cycle"] is True
+
+
+def test_keyboard_audit_traverses_more_than_twenty_sequential_targets(fixture_server):
+    result = _run_keyboard_audit(fixture_server, "keyboard-many-controls")
     sequence = next(
         check for check in result.checks if check.check_id == "sequential_navigation"
     )
 
-    assert sequence.status == "needs_review"
-    assert "or a trap" in sequence.summary
-    assert result.tab_actions <= 20
-    assert result.shift_tab_actions <= 2
+    assert result.tab_actions > 20
+    assert result.tab_actions <= 51
+    assert "#last-control" in [finding.selector for finding in result.findings]
+    assert sequence.evidence[0]["unobserved_candidates"] == []
 
 
 def test_keyboard_audit_reports_focus_obscuration_for_review(fixture_server):
@@ -1342,6 +1989,75 @@ def test_keyboard_audit_reports_focus_obscuration_for_review(fixture_server):
     assert obscuration.status == "needs_review"
     assert result.findings[0].obscured is True
     assert result.findings[0].occluding_selector == "#cover"
+    assert result.findings[0].occlusion_status == "potential_issue"
+    assert result.findings[0].target_rect["width"] > 0
+    assert result.findings[0].viewport == {"width": 800, "height": 600}
+    assert result.findings[0].occluding_evidence
+
+
+def test_keyboard_audit_confirms_opaque_full_cover_with_evidence(fixture_server):
+    result = _run_keyboard_audit(fixture_server, "keyboard-overlay-opaque")
+    obscuration = next(
+        check for check in result.checks if check.check_id == "focus_obscuration"
+    )
+
+    assert obscuration.status == "fail"
+    finding = result.findings[0]
+    assert finding.occlusion_status == "confirmed_failure"
+    assert finding.obscured is True
+    evidence = next(
+        item for item in finding.occluding_evidence
+        if item["selector"] == "#opaque-cover"
+    )
+    assert evidence["coversTarget"] is True
+    assert evidence["backgroundAlpha"] == 1
+    assert evidence["targetHitSamples"] == evidence["totalTargetSamples"]
+    assert finding.target_rect["left"] >= 0
+    assert finding.viewport == {"width": 800, "height": 600}
+
+
+def test_keyboard_audit_classifies_sticky_header_overlap_as_potential(
+    fixture_server,
+):
+    result = _run_keyboard_audit(fixture_server, "keyboard-sticky-partial")
+    obscuration = next(
+        check for check in result.checks if check.check_id == "focus_obscuration"
+    )
+
+    assert obscuration.status == "needs_review"
+    finding = result.findings[0]
+    assert finding.occlusion_status == "potential_issue"
+    assert finding.partially_obscured is True
+    assert finding.occluding_selector == "#sticky-header"
+
+
+def test_keyboard_audit_detects_opaque_dialog_cover(fixture_server):
+    result = _run_keyboard_audit(fixture_server, "keyboard-dialog")
+    obscuration = next(
+        check for check in result.checks if check.check_id == "focus_obscuration"
+    )
+
+    assert obscuration.status == "fail"
+    finding = result.findings[0]
+    assert finding.selector == "#covered"
+    assert finding.occlusion_status == "confirmed_failure"
+    assert any(
+        item["tagName"] == "dialog" and item["selector"] == "#cover-dialog"
+        for item in finding.occluding_evidence
+    )
+
+
+def test_keyboard_audit_reports_no_sampled_occlusion_without_overlay(
+    fixture_server,
+):
+    result = _run_keyboard_audit(fixture_server, "keyboard-unobscured")
+    obscuration = next(
+        check for check in result.checks if check.check_id == "focus_obscuration"
+    )
+
+    assert obscuration.status == "needs_review"
+    assert result.findings[0].occlusion_status == "no_issue_detected"
+    assert result.findings[0].occluding_evidence == []
 
 
 def test_keyboard_audit_skips_pages_without_interactive_controls(fixture_server):

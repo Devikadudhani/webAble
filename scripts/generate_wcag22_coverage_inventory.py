@@ -4,9 +4,13 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+from app.analyzers.hybrid_evaluation import QUESTIONNAIRE_QUESTIONS
 SOURCE_PATH = ROOT / "tests" / "fixtures" / "wcag22_criteria_source.json"
 JSON_PATH = ROOT / "docs" / "wcag-22-coverage-inventory.json"
 MARKDOWN_PATH = ROOT / "docs" / "wcag-22-coverage-inventory.md"
@@ -62,19 +66,20 @@ TESTS_BY_RULE = {
 }
 KEYBOARD_FOCUS_CHECKS = {
     "2.1.1": [
-        "Sequential Tab/Shift+Tab focus progression is sampled without activating controls."
+        "Sequential Tab/Shift+Tab focus progression is sampled without activating controls; up to 51 Tab actions cover the 50-candidate discovery cap plus one boundary action."
     ],
     "2.1.2": [
-        "A bounded Tab sequence looks for focus that stops advancing; suspected traps require review."
+        "A repeated consecutive Tab target is distinguished from a focus cycle; when Tab stalls, the bounded Shift+Tab sample records whether focus moves from that target. Repeated multi-target Tab cycles are also compared with reverse traversal. Evidence remains review-only because focus cycling does not establish whether a containing widget can be exited or dismissed."
     ],
     "2.4.3": [
-        "The observed Tab sequence is recorded; whether its order preserves meaning requires human review."
+        "The expanded bounded Tab sequence is recorded; whether its order preserves meaning requires human review."
     ],
     "2.4.7": [
         "Keyboard focus state is compared with a limited set of computed CSS indicator properties."
     ],
     "2.4.11": [
-        "Hit-testing samples focused-element points for possible complete occlusion."
+        "Samples a 5x5 interior hit-test grid for each keyboard-focused target, records its bounding rectangle and viewport, and identifies layered elements intercepting samples.",
+        "Classifies a full-cover candidate as a high-confidence failure only when one layered element covers the entire in-viewport target, intercepts every sample, has a fully opaque computed background and effective opacity of 1, and has no detected clip-path or mask; partial, translucent, clipped, or otherwise ambiguous overlap requires manual review.",
     ],
 }
 TEXT_REFLOW_CHECKS = {
@@ -84,6 +89,35 @@ TEXT_REFLOW_CHECKS = {
     "1.4.10": [
         "The existing page is measured at 320 CSS pixels wide; text and document-level overflow are evidence for review, not violations by themselves.",
         "A 256 CSS-pixel height probe runs when a table or ARIA table/grid is detected; this heuristic does not determine whether an exception applies, and browser zoom is unsupported."
+    ],
+}
+TEXT_SPACING_CHECKS = {
+    "1.4.12": [
+        "Applies line-height 1.5, paragraph margin after 2em, letter-spacing 0.12em, and word-spacing 0.16em to up to 300 visible text-bearing elements, then compares measurements with the captured baseline.",
+        "Reports changed clipping, overlap, container overflow, hidden text, or control visibility/hit testing as needs-review evidence; scrollable regions are identified and are not treated as violations.",
+    ],
+}
+ORIENTATION_CHECKS = {
+    "1.3.4": [
+        "Switches the CSS viewport between paired portrait and landscape dimensions and compares up to 300 visible text-bearing elements and controls by selector and opaque content signature.",
+        "Reports elements that disappear or change content between orientations as needs-review evidence. The check cannot decide whether a change is equivalent or whether an orientation restriction is essential, and does not emulate physical device rotation or all orientation-change events.",
+    ],
+}
+NON_TEXT_CONTRAST_CHECKS = {
+    "1.4.11": [
+        "Inspects up to 300 visible native controls, links, ARIA controls, and SVG shapes for solid computed CSS backgrounds, borders, outlines, fills, and strokes with estimated contrast below 3:1.",
+        "Reports measured color pairs and element geometry as needs-review evidence only. It cannot determine which visual boundary is necessary, evaluate pseudo-elements or box shadows, pixel-sample images/canvas/video, reliably resolve gradients and layered rendering, or establish that a low ratio violates the criterion.",
+    ],
+}
+HOVER_FOCUS_CONTENT_CHECKS = {
+    "1.4.13": [
+        "Samples up to four visible likely triggers without activating them, compares visible DOM content before and after pointer hover and focus, and records newly revealed content with trigger/content selectors, geometry, viewport, role, and opaque text signatures.",
+        "For revealed content, samples whether pointer entry keeps hover content visible, whether Escape dismisses it, whether it remains after focus blur, and whether its rectangle intersects other content. Findings remain needs-review evidence; custom triggers, pseudo-elements, native tooltips, delayed states, and semantic exceptions are not fully evaluated.",
+    ],
+}
+TARGET_SIZE_CHECKS = {
+    "2.5.8": [
+        "Measures visible, enabled pointer-target bounding boxes and reports targets narrower or shorter than 24 CSS px for review; WCAG exceptions and actual target spacing are not evaluated."
     ],
 }
 TESTS_BY_REFLOW_CRITERION = {
@@ -100,6 +134,62 @@ TESTS_BY_REFLOW_CRITERION = {
         "tests/test_capture.py::test_text_reflow_does_not_fail_legitimate_table_scrolling",
         "tests/test_capture.py::test_text_reflow_reports_unbreakable_text_overflow",
         "tests/test_capture.py::test_text_reflow_responsive_content_replacement_needs_review",
+    ],
+}
+TESTS_BY_TEXT_SPACING_CRITERION = {
+    "1.4.12": [
+        "tests/test_capture.py::test_text_spacing_usable_fixture_has_no_detected_geometry_issue",
+        "tests/test_capture.py::test_text_spacing_reports_fixed_height_clipping_for_review",
+        "tests/test_capture.py::test_text_spacing_reports_new_overlap_without_claiming_violation",
+        "tests/test_capture.py::test_text_spacing_reports_control_label_clipping_for_review",
+        "tests/test_capture.py::test_text_spacing_reports_control_obscured_after_content_reflows",
+        "tests/test_capture.py::test_text_spacing_keeps_scrollable_region_as_review_not_failure",
+        "tests/test_capture.py::test_text_spacing_overrides_restore_after_screenshot_failure",
+    ],
+}
+TESTS_BY_ORIENTATION_CRITERION = {
+    "1.3.4": [
+        "tests/test_capture.py::test_orientation_flexible_fixture_preserves_content_and_restores_viewport",
+        "tests/test_capture.py::test_orientation_reports_content_and_control_changes_for_manual_review",
+    ],
+}
+TESTS_BY_NON_TEXT_CONTRAST_CRITERION = {
+    "1.4.11": [
+        "tests/test_capture.py::test_non_text_contrast_reports_solid_color_candidates_for_review",
+        "tests/test_capture.py::test_accessibility_scan_preserves_axe_results_and_specific_evidence",
+    ],
+}
+TESTS_BY_TARGET_SIZE_CRITERION = {
+    "2.5.8": [
+        "tests/test_capture.py::test_target_size_audit_reports_small_visible_target_for_review",
+        "tests/test_capture.py::test_target_size_audit_does_not_flag_adequate_target",
+    ],
+}
+TESTS_BY_HOVER_FOCUS_CONTENT_CRITERION = {
+    "1.4.13": [
+        "tests/test_capture.py::test_hover_focus_compliant_tooltip_records_behavior_and_restores_focus",
+        "tests/test_capture.py::test_hover_focus_reports_content_that_pointer_cannot_enter",
+        "tests/test_capture.py::test_hover_focus_reports_undismissable_overlapping_focus_content",
+        "tests/test_capture.py::test_hover_focus_ignores_style_only_hover_changes",
+    ],
+}
+TESTS_BY_KEYBOARD_CRITERION = {
+    "2.1.1": [
+        "tests/test_capture.py::test_keyboard_audit_records_visible_keyboard_focus",
+        "tests/test_capture.py::test_keyboard_audit_traverses_more_than_twenty_sequential_targets",
+        "tests/test_capture.py::test_keyboard_audit_reports_interactive_candidate_skipped_by_tab",
+    ],
+    "2.1.2": [
+        "tests/test_capture.py::test_keyboard_audit_reports_potential_focus_trap_for_review",
+        "tests/test_capture.py::test_keyboard_audit_distinguishes_one_way_tab_block_from_trap",
+        "tests/test_capture.py::test_keyboard_audit_reports_wrapping_cycle_for_manual_review",
+    ],
+    "2.4.11": [
+        "tests/test_capture.py::test_keyboard_audit_reports_focus_obscuration_for_review",
+        "tests/test_capture.py::test_keyboard_audit_confirms_opaque_full_cover_with_evidence",
+        "tests/test_capture.py::test_keyboard_audit_classifies_sticky_header_overlap_as_potential",
+        "tests/test_capture.py::test_keyboard_audit_detects_opaque_dialog_cover",
+        "tests/test_capture.py::test_keyboard_audit_reports_no_sampled_occlusion_without_overlay",
     ],
 }
 
@@ -157,7 +247,21 @@ def build_inventory(source: dict, axe: dict) -> dict:
         active = [rule for rule in axe_rules if rule["effective_enabled"]]
         keyboard_checks = KEYBOARD_FOCUS_CHECKS.get(criterion_id, [])
         reflow_checks = TEXT_REFLOW_CHECKS.get(criterion_id, [])
-        if active or keyboard_checks or reflow_checks:
+        text_spacing_checks = TEXT_SPACING_CHECKS.get(criterion_id, [])
+        orientation_checks = ORIENTATION_CHECKS.get(criterion_id, [])
+        non_text_contrast_checks = NON_TEXT_CONTRAST_CHECKS.get(
+            criterion_id, []
+        )
+        hover_focus_content_checks = HOVER_FOCUS_CONTENT_CHECKS.get(
+            criterion_id, []
+        )
+        target_size_checks = TARGET_SIZE_CHECKS.get(criterion_id, [])
+        if (
+            active or keyboard_checks or reflow_checks
+            or text_spacing_checks or orientation_checks
+            or non_text_contrast_checks or hover_focus_content_checks
+            or target_size_checks
+        ):
             classification = "partial"
             if active:
                 mapped_count += 1
@@ -192,12 +296,24 @@ def build_inventory(source: dict, axe: dict) -> dict:
             "A WCAG tag records the axe rule author's criterion association; it is not evidence that the rule covers the full success criterion.",
             "The scanner records rule outcomes only when the rule runs and reports them. An absent result does not establish that the criterion passed.",
         ]
-        if not active and not keyboard_checks and not reflow_checks:
+        if (
+            not active and not keyboard_checks and not reflow_checks
+            and not text_spacing_checks and not hover_focus_content_checks
+            and not orientation_checks
+            and not non_text_contrast_checks
+            and not target_size_checks
+        ):
             limitations.insert(
                 0,
                 "No enabled axe rule selected by the current scanner carries this criterion's exact WCAG tag.",
             )
-        elif not active and (keyboard_checks or reflow_checks):
+        elif not active and (
+            keyboard_checks or reflow_checks
+        or text_spacing_checks or orientation_checks
+        or non_text_contrast_checks
+        or hover_focus_content_checks
+        or target_size_checks
+        ):
             limitations.insert(
                 0,
                 "No enabled axe rule selected by the current scanner carries this criterion's exact WCAG tag; the listed WebAble probes are separate, bounded evidence and do not establish criterion conformance.",
@@ -210,6 +326,16 @@ def build_inventory(source: dict, axe: dict) -> dict:
             }
         )
         rule_tests.extend(TESTS_BY_REFLOW_CRITERION.get(criterion_id, []))
+        rule_tests.extend(TESTS_BY_TEXT_SPACING_CRITERION.get(criterion_id, []))
+        rule_tests.extend(TESTS_BY_ORIENTATION_CRITERION.get(criterion_id, []))
+        rule_tests.extend(
+            TESTS_BY_NON_TEXT_CONTRAST_CRITERION.get(criterion_id, [])
+        )
+        rule_tests.extend(
+            TESTS_BY_HOVER_FOCUS_CONTENT_CRITERION.get(criterion_id, [])
+        )
+        rule_tests.extend(TESTS_BY_TARGET_SIZE_CRITERION.get(criterion_id, []))
+        rule_tests.extend(TESTS_BY_KEYBOARD_CRITERION.get(criterion_id, []))
         criterion_url = f"{source['source']}#{criterion['anchor']}"
         understanding_url = (
             "https://www.w3.org/WAI/WCAG22/Understanding/"
@@ -221,14 +347,39 @@ def build_inventory(source: dict, axe: dict) -> dict:
                 "criterion_url": criterion_url,
                 "understanding_url": understanding_url,
                 "coverage_classification": classification,
-                "automated_check_exists": bool(active or keyboard_checks or reflow_checks),
+                "questionnaire_question_ids": sorted(
+                    question.question_id
+                    for question in QUESTIONNAIRE_QUESTIONS
+                    if criterion_id in question.criterion_ids
+                ),
                 "axe_check_exists": bool(active),
                 "keyboard_focus_check_exists": bool(keyboard_checks),
                 "keyboard_focus_checks": keyboard_checks,
                 "text_reflow_check_exists": bool(reflow_checks),
                 "text_reflow_checks": reflow_checks,
+                "text_spacing_check_exists": bool(text_spacing_checks),
+                "text_spacing_checks": text_spacing_checks,
+                "orientation_check_exists": bool(orientation_checks),
+                "orientation_checks": orientation_checks,
+                "non_text_contrast_check_exists": bool(
+                    non_text_contrast_checks
+                ),
+                "non_text_contrast_checks": non_text_contrast_checks,
+                "hover_focus_content_check_exists": bool(
+                    hover_focus_content_checks
+                ),
+                "hover_focus_content_checks": hover_focus_content_checks,
+                "target_size_check_exists": bool(target_size_checks),
+                "target_size_checks": target_size_checks,
                 "axe_criterion_tag": tag,
                 "axe_rules": axe_rules,
+                "automated_check_exists": bool(
+                    active or keyboard_checks or reflow_checks
+                    or text_spacing_checks or orientation_checks
+                    or non_text_contrast_checks
+                    or hover_focus_content_checks
+                    or target_size_checks
+                ),
                 "failure_patterns": patterns,
                 "limitations": limitations,
                 "manual_evaluation_needed": True,
@@ -272,6 +423,14 @@ def build_inventory(source: dict, axe: dict) -> dict:
         "summary": {
             "criterion_count": len(entries),
             "mapped_criteria_with_enabled_selected_rules": mapped_count,
+            "criteria_with_questionnaire_mapping": sum(
+                bool(entry["questionnaire_question_ids"]) for entry in entries
+            ),
+            "manual_criteria_with_questionnaire_mapping": sum(
+                entry["coverage_classification"] == "manual_evaluation_required"
+                and bool(entry["questionnaire_question_ids"])
+                for entry in entries
+            ),
             "classification_counts": {
                 name: sum(
                     entry["coverage_classification"] == name for entry in entries
@@ -299,6 +458,7 @@ def render_markdown(inventory: dict) -> str:
         f"**Engine:** axe-core {inventory['axe_core_version']} (pinned package metadata)  ",
         "**In-scope criteria:** 55 (all A and AA criteria; AAA excluded; obsolete 4.1.1 excluded)  ",
         f"**Criteria with at least one enabled, scanner-selected exact WCAG criterion tag:** {summary['mapped_criteria_with_enabled_selected_rules']} of {summary['criterion_count']}",
+        f"**Criteria mapped to initial or conditional questionnaire questions:** {summary['criteria_with_questionnaire_mapping']} of {summary['criterion_count']} (manual-evaluation criteria: {summary['manual_criteria_with_questionnaire_mapping']} of 26)",
         "",
         "This inventory is evidence of rule associations and current checks, not a WCAG conformance statement. A WCAG tag on an axe rule is an association published in the rule metadata, not proof that the rule covers the whole success criterion. A rule result applies only to its documented test conditions and reported nodes.",
         "",
@@ -309,7 +469,7 @@ def render_markdown(inventory: dict) -> str:
         "- `manual_evaluation_required`: no enabled selected axe rule carries the exact criterion tag and representative human, assistive-technology, content, media, or interaction review is necessary.",
         "- `not_implemented`: no enabled selected exact-tag check exists; a bounded technical or interaction check may be developed, but none is implemented.",
         "",
-        "A criterion may need manual review even when classified `partial`. `automated_check_exists` includes bounded WebAble keyboard/focus and text/reflow probes when listed, while `axe_check_exists` records exact-tagged axe coverage separately. Neither means the whole criterion is automated. The scanner runs with these exact configuration tags: "
+        "A criterion may need manual review even when classified `partial`. `automated_check_exists` includes bounded WebAble keyboard/focus, orientation, non-text contrast, hover/focus-content, and text/reflow probes when listed, while `axe_check_exists` records exact-tagged axe coverage separately. Neither means the whole criterion is automated. The scanner runs with these exact configuration tags: "
         + ", ".join(f"`{tag}`" for tag in inventory["scanner_configuration"]["run_only_tags"])
         + ". Effective rule selection requires both package `enabled: true` and a matching runOnly tag.",
         "",
@@ -339,10 +499,16 @@ def render_markdown(inventory: dict) -> str:
                 f"- **Level / principle:** {criterion['level']} / {criterion['principle']}",
                 f"- **Intent:** {criterion['intent']}",
                 f"- **Coverage:** `{criterion['coverage_classification']}`",
+                f"- **Questionnaire question IDs:** {', '.join(f'`{item}`' for item in criterion['questionnaire_question_ids']) or 'none'}",
                 f"- **Automated check exists:** {str(criterion['automated_check_exists']).lower()}",
                 f"- **Axe check exists:** {str(criterion['axe_check_exists']).lower()}",
                 f"- **WebAble keyboard/focus check exists:** {str(criterion['keyboard_focus_check_exists']).lower()}",
                 f"- **WebAble text/reflow check exists:** {str(criterion['text_reflow_check_exists']).lower()}",
+                f"- **WebAble text-spacing check exists:** {str(criterion['text_spacing_check_exists']).lower()}",
+                f"- **WebAble orientation check exists:** {str(criterion['orientation_check_exists']).lower()}",
+                f"- **WebAble non-text contrast check exists:** {str(criterion['non_text_contrast_check_exists']).lower()}",
+                f"- **WebAble hover/focus-content check exists:** {str(criterion['hover_focus_content_check_exists']).lower()}",
+                f"- **WebAble target-size check exists:** {str(criterion['target_size_check_exists']).lower()}",
                 f"- **Exact criterion tag:** `{criterion['axe_criterion_tag']}`",
                 f"- **Manual / keyboard / interaction / assistive-technology testing needed:** "
                 f"{str(criterion['manual_evaluation_needed']).lower()} / "
@@ -388,6 +554,33 @@ def render_markdown(inventory: dict) -> str:
             lines.append("- **Bounded text/reflow checks:**")
             lines.extend(
                 f"  - {check}" for check in criterion["text_reflow_checks"]
+            )
+        if criterion["text_spacing_checks"]:
+            lines.append("- **Bounded text-spacing checks:**")
+            lines.extend(
+                f"  - {check}" for check in criterion["text_spacing_checks"]
+            )
+        if criterion["orientation_checks"]:
+            lines.append("- **Bounded orientation checks:**")
+            lines.extend(
+                f"  - {check}" for check in criterion["orientation_checks"]
+            )
+        if criterion["non_text_contrast_checks"]:
+            lines.append("- **Bounded non-text contrast checks:**")
+            lines.extend(
+                f"  - {check}"
+                for check in criterion["non_text_contrast_checks"]
+            )
+        if criterion["hover_focus_content_checks"]:
+            lines.append("- **Bounded hover/focus-content checks:**")
+            lines.extend(
+                f"  - {check}"
+                for check in criterion["hover_focus_content_checks"]
+            )
+        if criterion["target_size_checks"]:
+            lines.append("- **Bounded target-size checks:**")
+            lines.extend(
+                f"  - {check}" for check in criterion["target_size_checks"]
             )
         lines.extend(
             [

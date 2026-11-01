@@ -5,6 +5,7 @@
 **Engine:** axe-core 4.14.0 (pinned package metadata)  
 **In-scope criteria:** 55 (all A and AA criteria; AAA excluded; obsolete 4.1.1 excluded)  
 **Criteria with at least one enabled, scanner-selected exact WCAG criterion tag:** 20 of 55
+**Criteria mapped to initial or conditional questionnaire questions:** 55 of 55 (manual-evaluation criteria: 26 of 26)
 
 This inventory is evidence of rule associations and current checks, not a WCAG conformance statement. A WCAG tag on an axe rule is an association published in the rule metadata, not proof that the rule covers the whole success criterion. A rule result applies only to its documented test conditions and reported nodes.
 
@@ -15,16 +16,16 @@ This inventory is evidence of rule associations and current checks, not a WCAG c
 - `manual_evaluation_required`: no enabled selected axe rule carries the exact criterion tag and representative human, assistive-technology, content, media, or interaction review is necessary.
 - `not_implemented`: no enabled selected exact-tag check exists; a bounded technical or interaction check may be developed, but none is implemented.
 
-A criterion may need manual review even when classified `partial`. `automated_check_exists` includes bounded WebAble keyboard/focus and text/reflow probes when listed, while `axe_check_exists` records exact-tagged axe coverage separately. Neither means the whole criterion is automated. The scanner runs with these exact configuration tags: `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22aa`. Effective rule selection requires both package `enabled: true` and a matching runOnly tag.
+A criterion may need manual review even when classified `partial`. `automated_check_exists` includes bounded WebAble keyboard/focus, orientation, non-text contrast, hover/focus-content, and text/reflow probes when listed, while `axe_check_exists` records exact-tagged axe coverage separately. Neither means the whole criterion is automated. The scanner runs with these exact configuration tags: `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22aa`. Effective rule selection requires both package `enabled: true` and a matching runOnly tag.
 
 ## Summary
 
 | Classification | Count |
 |---|---:|
 | `automated` | 0 |
-| `partial` | 25 |
+| `partial` | 29 |
 | `manual_evaluation_required` | 26 |
-| `not_implemented` | 4 |
+| `not_implemented` | 0 |
 
 The 55 is the number of applicable WCAG 2.2 A/AA success criteria, not a scanner coverage percentage. The mapped-criterion count measures enabled, configured axe rules that carry the exact criterion tag; it is not a conformance rate or completeness measure.
 
@@ -37,10 +38,16 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
 - **Level / principle:** A / Perceivable
 - **Intent:** Provide text alternatives for non-text content, except where an exception applies.
 - **Coverage:** `partial`
+- **Questionnaire question IDs:** `visual.images_of_text`
 - **Automated check exists:** true
 - **Axe check exists:** true
 - **WebAble keyboard/focus check exists:** false
 - **WebAble text/reflow check exists:** false
+- **WebAble text-spacing check exists:** false
+- **WebAble orientation check exists:** false
+- **WebAble non-text contrast check exists:** false
+- **WebAble hover/focus-content check exists:** false
+- **WebAble target-size check exists:** false
 - **Exact criterion tag:** `wcag111`
 - **Manual / keyboard / interaction / assistive-technology testing needed:** true / false / false / true
 - **Normative criterion:** [1.1.1 Non-text Content](https://www.w3.org/TR/WCAG22/#non-text-content)
@@ -75,10 +82,16 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
 - **Level / principle:** A / Perceivable
 - **Intent:** Provide an equivalent alternative for prerecorded audio-only and video-only content.
 - **Coverage:** `manual_evaluation_required`
+- **Questionnaire question IDs:** `media.prerecorded_alternatives`
 - **Automated check exists:** false
 - **Axe check exists:** false
 - **WebAble keyboard/focus check exists:** false
 - **WebAble text/reflow check exists:** false
+- **WebAble text-spacing check exists:** false
+- **WebAble orientation check exists:** false
+- **WebAble non-text contrast check exists:** false
+- **WebAble hover/focus-content check exists:** false
+- **WebAble target-size check exists:** false
 - **Exact criterion tag:** `wcag121`
 - **Manual / keyboard / interaction / assistive-technology testing needed:** true / false / false / false
 - **Normative criterion:** [1.2.1 Audio-only and Video-only (Prerecorded)](https://www.w3.org/TR/WCAG22/#audio-only-and-video-only-prerecorded)
@@ -101,10 +114,16 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
 - **Level / principle:** A / Perceivable
 - **Intent:** Provide captions for prerecorded synchronized audio and video content.
 - **Coverage:** `partial`
+- **Questionnaire question IDs:** `media.prerecorded_captions`
 - **Automated check exists:** true
 - **Axe check exists:** true
 - **WebAble keyboard/focus check exists:** false
 - **WebAble text/reflow check exists:** false
+- **WebAble text-spacing check exists:** false
+- **WebAble orientation check exists:** false
+- **WebAble non-text contrast check exists:** false
+- **WebAble hover/focus-content check exists:** false
+- **WebAble target-size check exists:** false
 - **Exact criterion tag:** `wcag122`
 - **Manual / keyboard / interaction / assistive-technology testing needed:** true / false / true / false
 - **Normative criterion:** [1.2.2 Captions (Prerecorded)](https://www.w3.org/TR/WCAG22/#captions-prerecorded)
@@ -127,10 +146,16 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
 - **Level / principle:** A / Perceivable
 - **Intent:** Provide audio description or a complete text alternative for prerecorded synchronized media.
 - **Coverage:** `manual_evaluation_required`
+- **Questionnaire question IDs:** `media.prerecorded_audio_description_or_alternative`
 - **Automated check exists:** false
 - **Axe check exists:** false
 - **WebAble keyboard/focus check exists:** false
 - **WebAble text/reflow check exists:** false
+- **WebAble text-spacing check exists:** false
+- **WebAble orientation check exists:** false
+- **WebAble non-text contrast check exists:** false
+- **WebAble hover/focus-content check exists:** false
+- **WebAble target-size check exists:** false
 - **Exact criterion tag:** `wcag123`
 - **Manual / keyboard / interaction / assistive-technology testing needed:** true / false / false / false
 - **Normative criterion:** [1.2.3 Audio Description or Media Alternative (Prerecorded)](https://www.w3.org/TR/WCAG22/#audio-description-or-media-alternative-prerecorded)
@@ -152,10 +177,16 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
 - **Level / principle:** AA / Perceivable
 - **Intent:** Provide captions for live synchronized audio and video content.
 - **Coverage:** `manual_evaluation_required`
+- **Questionnaire question IDs:** `media.live_captions`
 - **Automated check exists:** false
 - **Axe check exists:** false
 - **WebAble keyboard/focus check exists:** false
 - **WebAble text/reflow check exists:** false
+- **WebAble text-spacing check exists:** false
+- **WebAble orientation check exists:** false
+- **WebAble non-text contrast check exists:** false
+- **WebAble hover/focus-content check exists:** false
+- **WebAble target-size check exists:** false
 - **Exact criterion tag:** `wcag124`
 - **Manual / keyboard / interaction / assistive-technology testing needed:** true / false / true / false
 - **Normative criterion:** [1.2.4 Captions (Live)](https://www.w3.org/TR/WCAG22/#captions-live)
@@ -177,10 +208,16 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
 - **Level / principle:** AA / Perceivable
 - **Intent:** Provide audio description for prerecorded video content.
 - **Coverage:** `manual_evaluation_required`
+- **Questionnaire question IDs:** `media.prerecorded_audio_description`
 - **Automated check exists:** false
 - **Axe check exists:** false
 - **WebAble keyboard/focus check exists:** false
 - **WebAble text/reflow check exists:** false
+- **WebAble text-spacing check exists:** false
+- **WebAble orientation check exists:** false
+- **WebAble non-text contrast check exists:** false
+- **WebAble hover/focus-content check exists:** false
+- **WebAble target-size check exists:** false
 - **Exact criterion tag:** `wcag125`
 - **Manual / keyboard / interaction / assistive-technology testing needed:** true / false / false / false
 - **Normative criterion:** [1.2.5 Audio Description (Prerecorded)](https://www.w3.org/TR/WCAG22/#audio-description-prerecorded)
@@ -202,10 +239,16 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
 - **Level / principle:** A / Perceivable
 - **Intent:** Make information, structure, and relationships programmatically determinable or available in text.
 - **Coverage:** `partial`
+- **Questionnaire question IDs:** `widgets.keyboard_operation`
 - **Automated check exists:** true
 - **Axe check exists:** true
 - **WebAble keyboard/focus check exists:** false
 - **WebAble text/reflow check exists:** false
+- **WebAble text-spacing check exists:** false
+- **WebAble orientation check exists:** false
+- **WebAble non-text contrast check exists:** false
+- **WebAble hover/focus-content check exists:** false
+- **WebAble target-size check exists:** false
 - **Exact criterion tag:** `wcag131`
 - **Manual / keyboard / interaction / assistive-technology testing needed:** true / false / false / true
 - **Normative criterion:** [1.3.1 Info and Relationships](https://www.w3.org/TR/WCAG22/#info-and-relationships)
@@ -247,10 +290,16 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
 - **Level / principle:** A / Perceivable
 - **Intent:** Preserve a meaningful reading or interaction sequence when presentation order matters.
 - **Coverage:** `manual_evaluation_required`
+- **Questionnaire question IDs:** `content.meaningful_sequence`, `layout.two_dimensional_content`
 - **Automated check exists:** false
 - **Axe check exists:** false
 - **WebAble keyboard/focus check exists:** false
 - **WebAble text/reflow check exists:** false
+- **WebAble text-spacing check exists:** false
+- **WebAble orientation check exists:** false
+- **WebAble non-text contrast check exists:** false
+- **WebAble hover/focus-content check exists:** false
+- **WebAble target-size check exists:** false
 - **Exact criterion tag:** `wcag132`
 - **Manual / keyboard / interaction / assistive-technology testing needed:** true / false / false / false
 - **Normative criterion:** [1.3.2 Meaningful Sequence](https://www.w3.org/TR/WCAG22/#meaningful-sequence)
@@ -272,10 +321,16 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
 - **Level / principle:** A / Perceivable
 - **Intent:** Do not rely solely on sensory characteristics to identify instructions or content.
 - **Coverage:** `manual_evaluation_required`
+- **Questionnaire question IDs:** `content.sensory_instructions`, `forms.sensory_instructions`, `widgets.sensory_instructions`
 - **Automated check exists:** false
 - **Axe check exists:** false
 - **WebAble keyboard/focus check exists:** false
 - **WebAble text/reflow check exists:** false
+- **WebAble text-spacing check exists:** false
+- **WebAble orientation check exists:** false
+- **WebAble non-text contrast check exists:** false
+- **WebAble hover/focus-content check exists:** false
+- **WebAble target-size check exists:** false
 - **Exact criterion tag:** `wcag133`
 - **Manual / keyboard / interaction / assistive-technology testing needed:** true / false / false / false
 - **Normative criterion:** [1.3.3 Sensory Characteristics](https://www.w3.org/TR/WCAG22/#sensory-characteristics)
@@ -296,11 +351,17 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
 
 - **Level / principle:** AA / Perceivable
 - **Intent:** Support content and functionality in both portrait and landscape orientation unless an exception applies.
-- **Coverage:** `not_implemented`
-- **Automated check exists:** false
+- **Coverage:** `partial`
+- **Questionnaire question IDs:** `content.orientation`
+- **Automated check exists:** true
 - **Axe check exists:** false
 - **WebAble keyboard/focus check exists:** false
 - **WebAble text/reflow check exists:** false
+- **WebAble text-spacing check exists:** false
+- **WebAble orientation check exists:** true
+- **WebAble non-text contrast check exists:** false
+- **WebAble hover/focus-content check exists:** false
+- **WebAble target-size check exists:** false
 - **Exact criterion tag:** `wcag134`
 - **Manual / keyboard / interaction / assistive-technology testing needed:** true / false / true / false
 - **Normative criterion:** [1.3.4 Orientation](https://www.w3.org/TR/WCAG22/#orientation)
@@ -308,13 +369,16 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
 - **Associated axe rules** (all exact WCAG-tagged rules in package metadata):
   - [`css-orientation-lock`](https://dequeuniversity.com/rules/axe/4.14/css-orientation-lock?application=axeAPI) — package enabled: `false`; scanner: `selected`; effective: `false`; tags: `cat.structure`, `wcag134`, `wcag21aa`, `EN-301-549`, `EN-9.1.3.4`, `RGAAv4`, `RGAA-13.9.1`, `experimental`
 - **Implemented failure patterns:** none mapped by an enabled, selected rule carrying this criterion's exact tag.
+- **Bounded orientation checks:**
+  - Switches the CSS viewport between paired portrait and landscape dimensions and compares up to 300 visible text-bearing elements and controls by selector and opaque content signature.
+  - Reports elements that disappear or change content between orientations as needs-review evidence. The check cannot decide whether a change is equivalent or whether an orientation restriction is essential, and does not emulate physical device rotation or all orientation-change events.
 - **Limitations:**
-  - No enabled axe rule selected by the current scanner carries this criterion's exact WCAG tag.
+  - No enabled axe rule selected by the current scanner carries this criterion's exact WCAG tag; the listed WebAble probes are separate, bounded evidence and do not establish criterion conformance.
   - A WCAG tag records the axe rule author's criterion association; it is not evidence that the rule covers the full success criterion.
   - The scanner records rule outcomes only when the rule runs and reports them. An absent result does not establish that the criterion passed.
-- **Relevant existing tests:** No focused criterion-specific fixture assertion currently exists.
+- **Relevant existing tests:** `tests/test_capture.py::test_orientation_flexible_fixture_preserves_content_and_restores_viewport`, `tests/test_capture.py::test_orientation_reports_content_and_control_changes_for_manual_review`
 - **Outstanding gaps / next step:**
-  - Design and validate a criterion-specific check or interaction scenario before adding automated coverage; do not infer a pass from the absence of an axe mapping.
+  - Validate the implemented checks with criterion-specific counterexamples against the criterion's Understanding guidance; retain manual review for aspects beyond their bounded scope.
   - No result from this scan may be described as WCAG conformance.
 - **Evidence links:** [1](https://www.w3.org/TR/WCAG22/#orientation), [2](https://www.w3.org/WAI/WCAG22/Understanding/orientation.html)
 
@@ -323,10 +387,16 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
 - **Level / principle:** AA / Perceivable
 - **Intent:** Programmatically identify the purpose of specified user-input fields.
 - **Coverage:** `partial`
+- **Questionnaire question IDs:** `forms.field_purpose`
 - **Automated check exists:** true
 - **Axe check exists:** true
 - **WebAble keyboard/focus check exists:** false
 - **WebAble text/reflow check exists:** false
+- **WebAble text-spacing check exists:** false
+- **WebAble orientation check exists:** false
+- **WebAble non-text contrast check exists:** false
+- **WebAble hover/focus-content check exists:** false
+- **WebAble target-size check exists:** false
 - **Exact criterion tag:** `wcag135`
 - **Manual / keyboard / interaction / assistive-technology testing needed:** true / false / false / true
 - **Normative criterion:** [1.3.5 Identify Input Purpose](https://www.w3.org/TR/WCAG22/#identify-input-purpose)
@@ -349,10 +419,16 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
 - **Level / principle:** A / Perceivable
 - **Intent:** Do not use color as the only visual means of conveying information, action, or distinction.
 - **Coverage:** `partial`
+- **Questionnaire question IDs:** `visual.color_and_contrast`
 - **Automated check exists:** true
 - **Axe check exists:** true
 - **WebAble keyboard/focus check exists:** false
 - **WebAble text/reflow check exists:** false
+- **WebAble text-spacing check exists:** false
+- **WebAble orientation check exists:** false
+- **WebAble non-text contrast check exists:** false
+- **WebAble hover/focus-content check exists:** false
+- **WebAble target-size check exists:** false
 - **Exact criterion tag:** `wcag141`
 - **Manual / keyboard / interaction / assistive-technology testing needed:** true / false / false / false
 - **Normative criterion:** [1.4.1 Use of Color](https://www.w3.org/TR/WCAG22/#use-of-color)
@@ -375,10 +451,16 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
 - **Level / principle:** A / Perceivable
 - **Intent:** Provide a mechanism to pause or stop certain automatically playing audio or control its volume.
 - **Coverage:** `partial`
+- **Questionnaire question IDs:** `media.audio_control`
 - **Automated check exists:** true
 - **Axe check exists:** true
 - **WebAble keyboard/focus check exists:** false
 - **WebAble text/reflow check exists:** false
+- **WebAble text-spacing check exists:** false
+- **WebAble orientation check exists:** false
+- **WebAble non-text contrast check exists:** false
+- **WebAble hover/focus-content check exists:** false
+- **WebAble target-size check exists:** false
 - **Exact criterion tag:** `wcag142`
 - **Manual / keyboard / interaction / assistive-technology testing needed:** true / false / true / false
 - **Normative criterion:** [1.4.2 Audio Control](https://www.w3.org/TR/WCAG22/#audio-control)
@@ -401,10 +483,16 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
 - **Level / principle:** AA / Perceivable
 - **Intent:** Meet minimum text and image-of-text contrast ratios, subject to defined exceptions.
 - **Coverage:** `partial`
+- **Questionnaire question IDs:** `visual.color_and_contrast`
 - **Automated check exists:** true
 - **Axe check exists:** true
 - **WebAble keyboard/focus check exists:** false
 - **WebAble text/reflow check exists:** false
+- **WebAble text-spacing check exists:** false
+- **WebAble orientation check exists:** false
+- **WebAble non-text contrast check exists:** false
+- **WebAble hover/focus-content check exists:** false
+- **WebAble target-size check exists:** false
 - **Exact criterion tag:** `wcag143`
 - **Manual / keyboard / interaction / assistive-technology testing needed:** true / false / false / false
 - **Normative criterion:** [1.4.3 Contrast (Minimum)](https://www.w3.org/TR/WCAG22/#contrast-minimum)
@@ -427,10 +515,16 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
 - **Level / principle:** AA / Perceivable
 - **Intent:** Allow text to be resized up to 200 percent without loss of content or functionality.
 - **Coverage:** `partial`
+- **Questionnaire question IDs:** `content.text_resize`
 - **Automated check exists:** true
 - **Axe check exists:** true
 - **WebAble keyboard/focus check exists:** false
 - **WebAble text/reflow check exists:** true
+- **WebAble text-spacing check exists:** false
+- **WebAble orientation check exists:** false
+- **WebAble non-text contrast check exists:** false
+- **WebAble hover/focus-content check exists:** false
+- **WebAble target-size check exists:** false
 - **Exact criterion tag:** `wcag144`
 - **Manual / keyboard / interaction / assistive-technology testing needed:** true / false / true / false
 - **Normative criterion:** [1.4.4 Resize Text](https://www.w3.org/TR/WCAG22/#resize-text)
@@ -455,10 +549,16 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
 - **Level / principle:** AA / Perceivable
 - **Intent:** Use text rather than images of text except where an exception applies.
 - **Coverage:** `manual_evaluation_required`
+- **Questionnaire question IDs:** `visual.images_of_text`
 - **Automated check exists:** false
 - **Axe check exists:** false
 - **WebAble keyboard/focus check exists:** false
 - **WebAble text/reflow check exists:** false
+- **WebAble text-spacing check exists:** false
+- **WebAble orientation check exists:** false
+- **WebAble non-text contrast check exists:** false
+- **WebAble hover/focus-content check exists:** false
+- **WebAble target-size check exists:** false
 - **Exact criterion tag:** `wcag145`
 - **Manual / keyboard / interaction / assistive-technology testing needed:** true / false / false / false
 - **Normative criterion:** [1.4.5 Images of Text](https://www.w3.org/TR/WCAG22/#images-of-text)
@@ -480,10 +580,16 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
 - **Level / principle:** AA / Perceivable
 - **Intent:** Present content without two-dimensional scrolling at specified narrow viewport or zoom conditions, except where essential.
 - **Coverage:** `partial`
+- **Questionnaire question IDs:** `layout.two_dimensional_content`
 - **Automated check exists:** true
 - **Axe check exists:** false
 - **WebAble keyboard/focus check exists:** false
 - **WebAble text/reflow check exists:** true
+- **WebAble text-spacing check exists:** false
+- **WebAble orientation check exists:** false
+- **WebAble non-text contrast check exists:** false
+- **WebAble hover/focus-content check exists:** false
+- **WebAble target-size check exists:** false
 - **Exact criterion tag:** `wcag1410`
 - **Manual / keyboard / interaction / assistive-technology testing needed:** true / false / true / false
 - **Normative criterion:** [1.4.10 Reflow](https://www.w3.org/TR/WCAG22/#reflow)
@@ -507,24 +613,33 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
 
 - **Level / principle:** AA / Perceivable
 - **Intent:** Provide required contrast for visual information needed to identify interface components and graphical objects.
-- **Coverage:** `not_implemented`
-- **Automated check exists:** false
+- **Coverage:** `partial`
+- **Questionnaire question IDs:** `visual.color_and_contrast`
+- **Automated check exists:** true
 - **Axe check exists:** false
 - **WebAble keyboard/focus check exists:** false
 - **WebAble text/reflow check exists:** false
+- **WebAble text-spacing check exists:** false
+- **WebAble orientation check exists:** false
+- **WebAble non-text contrast check exists:** true
+- **WebAble hover/focus-content check exists:** false
+- **WebAble target-size check exists:** false
 - **Exact criterion tag:** `wcag1411`
 - **Manual / keyboard / interaction / assistive-technology testing needed:** true / false / false / false
 - **Normative criterion:** [1.4.11 Non-text Contrast](https://www.w3.org/TR/WCAG22/#non-text-contrast)
 - **Understanding:** [Understanding 1.4.11](https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html)
 - **Associated axe rules:** none with this criterion tag in axe-core 4.14.0 metadata.
 - **Implemented failure patterns:** none mapped by an enabled, selected rule carrying this criterion's exact tag.
+- **Bounded non-text contrast checks:**
+  - Inspects up to 300 visible native controls, links, ARIA controls, and SVG shapes for solid computed CSS backgrounds, borders, outlines, fills, and strokes with estimated contrast below 3:1.
+  - Reports measured color pairs and element geometry as needs-review evidence only. It cannot determine which visual boundary is necessary, evaluate pseudo-elements or box shadows, pixel-sample images/canvas/video, reliably resolve gradients and layered rendering, or establish that a low ratio violates the criterion.
 - **Limitations:**
-  - No enabled axe rule selected by the current scanner carries this criterion's exact WCAG tag.
+  - No enabled axe rule selected by the current scanner carries this criterion's exact WCAG tag; the listed WebAble probes are separate, bounded evidence and do not establish criterion conformance.
   - A WCAG tag records the axe rule author's criterion association; it is not evidence that the rule covers the full success criterion.
   - The scanner records rule outcomes only when the rule runs and reports them. An absent result does not establish that the criterion passed.
-- **Relevant existing tests:** No focused criterion-specific fixture assertion currently exists.
+- **Relevant existing tests:** `tests/test_capture.py::test_non_text_contrast_reports_solid_color_candidates_for_review`, `tests/test_capture.py::test_accessibility_scan_preserves_axe_results_and_specific_evidence`
 - **Outstanding gaps / next step:**
-  - Design and validate a criterion-specific check or interaction scenario before adding automated coverage; do not infer a pass from the absence of an axe mapping.
+  - Validate the implemented checks with criterion-specific counterexamples against the criterion's Understanding guidance; retain manual review for aspects beyond their bounded scope.
   - No result from this scan may be described as WCAG conformance.
 - **Evidence links:** [1](https://www.w3.org/TR/WCAG22/#non-text-contrast), [2](https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html)
 
@@ -533,10 +648,16 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
 - **Level / principle:** AA / Perceivable
 - **Intent:** Preserve content and functionality when users override specified text-spacing properties.
 - **Coverage:** `partial`
+- **Questionnaire question IDs:** `content.text_spacing`
 - **Automated check exists:** true
 - **Axe check exists:** true
 - **WebAble keyboard/focus check exists:** false
 - **WebAble text/reflow check exists:** false
+- **WebAble text-spacing check exists:** true
+- **WebAble orientation check exists:** false
+- **WebAble non-text contrast check exists:** false
+- **WebAble hover/focus-content check exists:** false
+- **WebAble target-size check exists:** false
 - **Exact criterion tag:** `wcag1412`
 - **Manual / keyboard / interaction / assistive-technology testing needed:** true / false / true / false
 - **Normative criterion:** [1.4.12 Text Spacing](https://www.w3.org/TR/WCAG22/#text-spacing)
@@ -545,10 +666,13 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
   - [`avoid-inline-spacing`](https://dequeuniversity.com/rules/axe/4.14/avoid-inline-spacing?application=axeAPI) — package enabled: `true`; scanner: `selected`; effective: `true`; tags: `cat.structure`, `wcag21aa`, `wcag1412`, `EN-301-549`, `EN-9.1.4.12`, `ACT`
 - **Implemented failure patterns (rule-description scope, not exhaustive):**
   - `avoid-inline-spacing`: Ensure that text spacing set through style attributes can be adjusted with custom stylesheets ([rule help](https://dequeuniversity.com/rules/axe/4.14/avoid-inline-spacing?application=axeAPI))
+- **Bounded text-spacing checks:**
+  - Applies line-height 1.5, paragraph margin after 2em, letter-spacing 0.12em, and word-spacing 0.16em to up to 300 visible text-bearing elements, then compares measurements with the captured baseline.
+  - Reports changed clipping, overlap, container overflow, hidden text, or control visibility/hit testing as needs-review evidence; scrollable regions are identified and are not treated as violations.
 - **Limitations:**
   - A WCAG tag records the axe rule author's criterion association; it is not evidence that the rule covers the full success criterion.
   - The scanner records rule outcomes only when the rule runs and reports them. An absent result does not establish that the criterion passed.
-- **Relevant existing tests:** No focused criterion-specific fixture assertion currently exists.
+- **Relevant existing tests:** `tests/test_capture.py::test_text_spacing_usable_fixture_has_no_detected_geometry_issue`, `tests/test_capture.py::test_text_spacing_reports_fixed_height_clipping_for_review`, `tests/test_capture.py::test_text_spacing_reports_new_overlap_without_claiming_violation`, `tests/test_capture.py::test_text_spacing_reports_control_label_clipping_for_review`, `tests/test_capture.py::test_text_spacing_reports_control_obscured_after_content_reflows`, `tests/test_capture.py::test_text_spacing_keeps_scrollable_region_as_review_not_failure`, `tests/test_capture.py::test_text_spacing_overrides_restore_after_screenshot_failure`
 - **Outstanding gaps / next step:**
   - Validate the implemented checks with criterion-specific counterexamples against the criterion's Understanding guidance; retain manual review for aspects beyond their bounded scope.
   - No result from this scan may be described as WCAG conformance.
@@ -558,24 +682,33 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
 
 - **Level / principle:** AA / Perceivable
 - **Intent:** Make additional content shown on hover or focus dismissible, hoverable, and persistent as required.
-- **Coverage:** `not_implemented`
-- **Automated check exists:** false
+- **Coverage:** `partial`
+- **Questionnaire question IDs:** `widgets.hover_focus_content`
+- **Automated check exists:** true
 - **Axe check exists:** false
 - **WebAble keyboard/focus check exists:** false
 - **WebAble text/reflow check exists:** false
+- **WebAble text-spacing check exists:** false
+- **WebAble orientation check exists:** false
+- **WebAble non-text contrast check exists:** false
+- **WebAble hover/focus-content check exists:** true
+- **WebAble target-size check exists:** false
 - **Exact criterion tag:** `wcag1413`
 - **Manual / keyboard / interaction / assistive-technology testing needed:** true / false / true / false
 - **Normative criterion:** [1.4.13 Content on Hover or Focus](https://www.w3.org/TR/WCAG22/#content-on-hover-or-focus)
 - **Understanding:** [Understanding 1.4.13](https://www.w3.org/WAI/WCAG22/Understanding/content-on-hover-or-focus.html)
 - **Associated axe rules:** none with this criterion tag in axe-core 4.14.0 metadata.
 - **Implemented failure patterns:** none mapped by an enabled, selected rule carrying this criterion's exact tag.
+- **Bounded hover/focus-content checks:**
+  - Samples up to four visible likely triggers without activating them, compares visible DOM content before and after pointer hover and focus, and records newly revealed content with trigger/content selectors, geometry, viewport, role, and opaque text signatures.
+  - For revealed content, samples whether pointer entry keeps hover content visible, whether Escape dismisses it, whether it remains after focus blur, and whether its rectangle intersects other content. Findings remain needs-review evidence; custom triggers, pseudo-elements, native tooltips, delayed states, and semantic exceptions are not fully evaluated.
 - **Limitations:**
-  - No enabled axe rule selected by the current scanner carries this criterion's exact WCAG tag.
+  - No enabled axe rule selected by the current scanner carries this criterion's exact WCAG tag; the listed WebAble probes are separate, bounded evidence and do not establish criterion conformance.
   - A WCAG tag records the axe rule author's criterion association; it is not evidence that the rule covers the full success criterion.
   - The scanner records rule outcomes only when the rule runs and reports them. An absent result does not establish that the criterion passed.
-- **Relevant existing tests:** No focused criterion-specific fixture assertion currently exists.
+- **Relevant existing tests:** `tests/test_capture.py::test_hover_focus_compliant_tooltip_records_behavior_and_restores_focus`, `tests/test_capture.py::test_hover_focus_reports_content_that_pointer_cannot_enter`, `tests/test_capture.py::test_hover_focus_reports_undismissable_overlapping_focus_content`, `tests/test_capture.py::test_hover_focus_ignores_style_only_hover_changes`
 - **Outstanding gaps / next step:**
-  - Design and validate a criterion-specific check or interaction scenario before adding automated coverage; do not infer a pass from the absence of an axe mapping.
+  - Validate the implemented checks with criterion-specific counterexamples against the criterion's Understanding guidance; retain manual review for aspects beyond their bounded scope.
   - No result from this scan may be described as WCAG conformance.
 - **Evidence links:** [1](https://www.w3.org/TR/WCAG22/#content-on-hover-or-focus), [2](https://www.w3.org/WAI/WCAG22/Understanding/content-on-hover-or-focus.html)
 
@@ -584,10 +717,16 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
 - **Level / principle:** A / Operable
 - **Intent:** Make all functionality operable through a keyboard interface, except where the function depends on path-based input.
 - **Coverage:** `partial`
+- **Questionnaire question IDs:** `widgets.keyboard_operation`
 - **Automated check exists:** true
 - **Axe check exists:** true
 - **WebAble keyboard/focus check exists:** true
 - **WebAble text/reflow check exists:** false
+- **WebAble text-spacing check exists:** false
+- **WebAble orientation check exists:** false
+- **WebAble non-text contrast check exists:** false
+- **WebAble hover/focus-content check exists:** false
+- **WebAble target-size check exists:** false
 - **Exact criterion tag:** `wcag211`
 - **Manual / keyboard / interaction / assistive-technology testing needed:** true / true / true / true
 - **Normative criterion:** [2.1.1 Keyboard](https://www.w3.org/TR/WCAG22/#keyboard)
@@ -601,11 +740,11 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
   - `scrollable-region-focusable`: Ensure elements that have scrollable content are accessible by keyboard in Safari ([rule help](https://dequeuniversity.com/rules/axe/4.14/scrollable-region-focusable?application=axeAPI))
   - `server-side-image-map`: Ensure that server-side image maps are not used ([rule help](https://dequeuniversity.com/rules/axe/4.14/server-side-image-map?application=axeAPI))
 - **Bounded keyboard/focus checks:**
-  - Sequential Tab/Shift+Tab focus progression is sampled without activating controls.
+  - Sequential Tab/Shift+Tab focus progression is sampled without activating controls; up to 51 Tab actions cover the 50-candidate discovery cap plus one boundary action.
 - **Limitations:**
   - A WCAG tag records the axe rule author's criterion association; it is not evidence that the rule covers the full success criterion.
   - The scanner records rule outcomes only when the rule runs and reports them. An absent result does not establish that the criterion passed.
-- **Relevant existing tests:** No focused criterion-specific fixture assertion currently exists.
+- **Relevant existing tests:** `tests/test_capture.py::test_keyboard_audit_records_visible_keyboard_focus`, `tests/test_capture.py::test_keyboard_audit_traverses_more_than_twenty_sequential_targets`, `tests/test_capture.py::test_keyboard_audit_reports_interactive_candidate_skipped_by_tab`
 - **Outstanding gaps / next step:**
   - Validate the implemented checks with criterion-specific counterexamples against the criterion's Understanding guidance; retain manual review for aspects beyond their bounded scope.
   - No result from this scan may be described as WCAG conformance.
@@ -616,10 +755,16 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
 - **Level / principle:** A / Operable
 - **Intent:** Allow keyboard focus to move away from every component using only the keyboard.
 - **Coverage:** `partial`
+- **Questionnaire question IDs:** `widgets.keyboard_operation`
 - **Automated check exists:** true
 - **Axe check exists:** false
 - **WebAble keyboard/focus check exists:** true
 - **WebAble text/reflow check exists:** false
+- **WebAble text-spacing check exists:** false
+- **WebAble orientation check exists:** false
+- **WebAble non-text contrast check exists:** false
+- **WebAble hover/focus-content check exists:** false
+- **WebAble target-size check exists:** false
 - **Exact criterion tag:** `wcag212`
 - **Manual / keyboard / interaction / assistive-technology testing needed:** true / true / true / false
 - **Normative criterion:** [2.1.2 No Keyboard Trap](https://www.w3.org/TR/WCAG22/#no-keyboard-trap)
@@ -627,12 +772,12 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
 - **Associated axe rules:** none with this criterion tag in axe-core 4.14.0 metadata.
 - **Implemented failure patterns:** none mapped by an enabled, selected rule carrying this criterion's exact tag.
 - **Bounded keyboard/focus checks:**
-  - A bounded Tab sequence looks for focus that stops advancing; suspected traps require review.
+  - A repeated consecutive Tab target is distinguished from a focus cycle; when Tab stalls, the bounded Shift+Tab sample records whether focus moves from that target. Repeated multi-target Tab cycles are also compared with reverse traversal. Evidence remains review-only because focus cycling does not establish whether a containing widget can be exited or dismissed.
 - **Limitations:**
   - No enabled axe rule selected by the current scanner carries this criterion's exact WCAG tag; the listed WebAble probes are separate, bounded evidence and do not establish criterion conformance.
   - A WCAG tag records the axe rule author's criterion association; it is not evidence that the rule covers the full success criterion.
   - The scanner records rule outcomes only when the rule runs and reports them. An absent result does not establish that the criterion passed.
-- **Relevant existing tests:** No focused criterion-specific fixture assertion currently exists.
+- **Relevant existing tests:** `tests/test_capture.py::test_keyboard_audit_reports_potential_focus_trap_for_review`, `tests/test_capture.py::test_keyboard_audit_distinguishes_one_way_tab_block_from_trap`, `tests/test_capture.py::test_keyboard_audit_reports_wrapping_cycle_for_manual_review`
 - **Outstanding gaps / next step:**
   - Validate the implemented checks with criterion-specific counterexamples against the criterion's Understanding guidance; retain manual review for aspects beyond their bounded scope.
   - No result from this scan may be described as WCAG conformance.
@@ -643,10 +788,16 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
 - **Level / principle:** A / Operable
 - **Intent:** Provide a way to turn off, remap, or limit single-character shortcuts in applicable contexts.
 - **Coverage:** `manual_evaluation_required`
+- **Questionnaire question IDs:** `keyboard.character_shortcuts`
 - **Automated check exists:** false
 - **Axe check exists:** false
 - **WebAble keyboard/focus check exists:** false
 - **WebAble text/reflow check exists:** false
+- **WebAble text-spacing check exists:** false
+- **WebAble orientation check exists:** false
+- **WebAble non-text contrast check exists:** false
+- **WebAble hover/focus-content check exists:** false
+- **WebAble target-size check exists:** false
 - **Exact criterion tag:** `wcag214`
 - **Manual / keyboard / interaction / assistive-technology testing needed:** true / true / true / false
 - **Normative criterion:** [2.1.4 Character Key Shortcuts](https://www.w3.org/TR/WCAG22/#character-key-shortcuts)
@@ -668,10 +819,16 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
 - **Level / principle:** A / Operable
 - **Intent:** Allow users to turn off, adjust, or extend time limits, subject to exceptions.
 - **Coverage:** `partial`
+- **Questionnaire question IDs:** `timing.adjustment`
 - **Automated check exists:** true
 - **Axe check exists:** true
 - **WebAble keyboard/focus check exists:** false
 - **WebAble text/reflow check exists:** false
+- **WebAble text-spacing check exists:** false
+- **WebAble orientation check exists:** false
+- **WebAble non-text contrast check exists:** false
+- **WebAble hover/focus-content check exists:** false
+- **WebAble target-size check exists:** false
 - **Exact criterion tag:** `wcag221`
 - **Manual / keyboard / interaction / assistive-technology testing needed:** true / false / true / false
 - **Normative criterion:** [2.2.1 Timing Adjustable](https://www.w3.org/TR/WCAG22/#timing-adjustable)
@@ -694,10 +851,16 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
 - **Level / principle:** A / Operable
 - **Intent:** Provide controls for certain moving, blinking, scrolling, or auto-updating content.
 - **Coverage:** `partial`
+- **Questionnaire question IDs:** `motion.pause_and_flash`
 - **Automated check exists:** true
 - **Axe check exists:** true
 - **WebAble keyboard/focus check exists:** false
 - **WebAble text/reflow check exists:** false
+- **WebAble text-spacing check exists:** false
+- **WebAble orientation check exists:** false
+- **WebAble non-text contrast check exists:** false
+- **WebAble hover/focus-content check exists:** false
+- **WebAble target-size check exists:** false
 - **Exact criterion tag:** `wcag222`
 - **Manual / keyboard / interaction / assistive-technology testing needed:** true / false / true / false
 - **Normative criterion:** [2.2.2 Pause, Stop, Hide](https://www.w3.org/TR/WCAG22/#pause-stop-hide)
@@ -722,10 +885,16 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
 - **Level / principle:** A / Operable
 - **Intent:** Ensure content does not flash more than three times per second unless below defined thresholds.
 - **Coverage:** `manual_evaluation_required`
+- **Questionnaire question IDs:** `motion.flash_threshold`
 - **Automated check exists:** false
 - **Axe check exists:** false
 - **WebAble keyboard/focus check exists:** false
 - **WebAble text/reflow check exists:** false
+- **WebAble text-spacing check exists:** false
+- **WebAble orientation check exists:** false
+- **WebAble non-text contrast check exists:** false
+- **WebAble hover/focus-content check exists:** false
+- **WebAble target-size check exists:** false
 - **Exact criterion tag:** `wcag231`
 - **Manual / keyboard / interaction / assistive-technology testing needed:** true / false / true / false
 - **Normative criterion:** [2.3.1 Three Flashes or Below Threshold](https://www.w3.org/TR/WCAG22/#three-flashes-or-below-threshold)
@@ -747,10 +916,16 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
 - **Level / principle:** A / Operable
 - **Intent:** Provide a way to bypass blocks of content repeated across multiple pages.
 - **Coverage:** `partial`
+- **Questionnaire question IDs:** `pages.bypass_repeated_blocks`
 - **Automated check exists:** true
 - **Axe check exists:** true
 - **WebAble keyboard/focus check exists:** false
 - **WebAble text/reflow check exists:** false
+- **WebAble text-spacing check exists:** false
+- **WebAble orientation check exists:** false
+- **WebAble non-text contrast check exists:** false
+- **WebAble hover/focus-content check exists:** false
+- **WebAble target-size check exists:** false
 - **Exact criterion tag:** `wcag241`
 - **Manual / keyboard / interaction / assistive-technology testing needed:** true / false / false / false
 - **Normative criterion:** [2.4.1 Bypass Blocks](https://www.w3.org/TR/WCAG22/#bypass-blocks)
@@ -773,10 +948,16 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
 - **Level / principle:** A / Operable
 - **Intent:** Give each web page a title that describes its topic or purpose.
 - **Coverage:** `partial`
+- **Questionnaire question IDs:** `pages.descriptive_titles`
 - **Automated check exists:** true
 - **Axe check exists:** true
 - **WebAble keyboard/focus check exists:** false
 - **WebAble text/reflow check exists:** false
+- **WebAble text-spacing check exists:** false
+- **WebAble orientation check exists:** false
+- **WebAble non-text contrast check exists:** false
+- **WebAble hover/focus-content check exists:** false
+- **WebAble target-size check exists:** false
 - **Exact criterion tag:** `wcag242`
 - **Manual / keyboard / interaction / assistive-technology testing needed:** true / false / false / false
 - **Normative criterion:** [2.4.2 Page Titled](https://www.w3.org/TR/WCAG22/#page-titled)
@@ -799,10 +980,16 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
 - **Level / principle:** A / Operable
 - **Intent:** Ensure sequential focus order preserves meaning and operability.
 - **Coverage:** `partial`
+- **Questionnaire question IDs:** `widgets.keyboard_operation`
 - **Automated check exists:** true
 - **Axe check exists:** false
 - **WebAble keyboard/focus check exists:** true
 - **WebAble text/reflow check exists:** false
+- **WebAble text-spacing check exists:** false
+- **WebAble orientation check exists:** false
+- **WebAble non-text contrast check exists:** false
+- **WebAble hover/focus-content check exists:** false
+- **WebAble target-size check exists:** false
 - **Exact criterion tag:** `wcag243`
 - **Manual / keyboard / interaction / assistive-technology testing needed:** true / true / true / false
 - **Normative criterion:** [2.4.3 Focus Order](https://www.w3.org/TR/WCAG22/#focus-order)
@@ -810,7 +997,7 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
 - **Associated axe rules:** none with this criterion tag in axe-core 4.14.0 metadata.
 - **Implemented failure patterns:** none mapped by an enabled, selected rule carrying this criterion's exact tag.
 - **Bounded keyboard/focus checks:**
-  - The observed Tab sequence is recorded; whether its order preserves meaning requires human review.
+  - The expanded bounded Tab sequence is recorded; whether its order preserves meaning requires human review.
 - **Limitations:**
   - No enabled axe rule selected by the current scanner carries this criterion's exact WCAG tag; the listed WebAble probes are separate, bounded evidence and do not establish criterion conformance.
   - A WCAG tag records the axe rule author's criterion association; it is not evidence that the rule covers the full success criterion.
@@ -826,10 +1013,16 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
 - **Level / principle:** A / Operable
 - **Intent:** Make the purpose of each link determinable from its text or programmatically determined context, with exceptions.
 - **Coverage:** `partial`
+- **Questionnaire question IDs:** `pages.link_purpose`
 - **Automated check exists:** true
 - **Axe check exists:** true
 - **WebAble keyboard/focus check exists:** false
 - **WebAble text/reflow check exists:** false
+- **WebAble text-spacing check exists:** false
+- **WebAble orientation check exists:** false
+- **WebAble non-text contrast check exists:** false
+- **WebAble hover/focus-content check exists:** false
+- **WebAble target-size check exists:** false
 - **Exact criterion tag:** `wcag244`
 - **Manual / keyboard / interaction / assistive-technology testing needed:** true / false / false / true
 - **Normative criterion:** [2.4.4 Link Purpose (In Context)](https://www.w3.org/TR/WCAG22/#link-purpose-in-context)
@@ -854,10 +1047,16 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
 - **Level / principle:** AA / Operable
 - **Intent:** Provide more than one way to locate a page within a set of pages, subject to exceptions.
 - **Coverage:** `manual_evaluation_required`
+- **Questionnaire question IDs:** `pages.multiple_ways_to_find`
 - **Automated check exists:** false
 - **Axe check exists:** false
 - **WebAble keyboard/focus check exists:** false
 - **WebAble text/reflow check exists:** false
+- **WebAble text-spacing check exists:** false
+- **WebAble orientation check exists:** false
+- **WebAble non-text contrast check exists:** false
+- **WebAble hover/focus-content check exists:** false
+- **WebAble target-size check exists:** false
 - **Exact criterion tag:** `wcag245`
 - **Manual / keyboard / interaction / assistive-technology testing needed:** true / false / false / false
 - **Normative criterion:** [2.4.5 Multiple Ways](https://www.w3.org/TR/WCAG22/#multiple-ways)
@@ -879,10 +1078,16 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
 - **Level / principle:** AA / Operable
 - **Intent:** Use headings and labels that describe topic or purpose.
 - **Coverage:** `manual_evaluation_required`
+- **Questionnaire question IDs:** `content.headings_and_labels`
 - **Automated check exists:** false
 - **Axe check exists:** false
 - **WebAble keyboard/focus check exists:** false
 - **WebAble text/reflow check exists:** false
+- **WebAble text-spacing check exists:** false
+- **WebAble orientation check exists:** false
+- **WebAble non-text contrast check exists:** false
+- **WebAble hover/focus-content check exists:** false
+- **WebAble target-size check exists:** false
 - **Exact criterion tag:** `wcag246`
 - **Manual / keyboard / interaction / assistive-technology testing needed:** true / false / false / false
 - **Normative criterion:** [2.4.6 Headings and Labels](https://www.w3.org/TR/WCAG22/#headings-and-labels)
@@ -904,10 +1109,16 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
 - **Level / principle:** AA / Operable
 - **Intent:** Make the keyboard focus indicator visible.
 - **Coverage:** `partial`
+- **Questionnaire question IDs:** `widgets.keyboard_operation`
 - **Automated check exists:** true
 - **Axe check exists:** false
 - **WebAble keyboard/focus check exists:** true
 - **WebAble text/reflow check exists:** false
+- **WebAble text-spacing check exists:** false
+- **WebAble orientation check exists:** false
+- **WebAble non-text contrast check exists:** false
+- **WebAble hover/focus-content check exists:** false
+- **WebAble target-size check exists:** false
 - **Exact criterion tag:** `wcag247`
 - **Manual / keyboard / interaction / assistive-technology testing needed:** true / true / true / false
 - **Normative criterion:** [2.4.7 Focus Visible](https://www.w3.org/TR/WCAG22/#focus-visible)
@@ -931,10 +1142,16 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
 - **Level / principle:** AA / Operable
 - **Intent:** Ensure a focused component is not entirely hidden by author-created content.
 - **Coverage:** `partial`
+- **Questionnaire question IDs:** `widgets.focus_not_obscured`
 - **Automated check exists:** true
 - **Axe check exists:** false
 - **WebAble keyboard/focus check exists:** true
 - **WebAble text/reflow check exists:** false
+- **WebAble text-spacing check exists:** false
+- **WebAble orientation check exists:** false
+- **WebAble non-text contrast check exists:** false
+- **WebAble hover/focus-content check exists:** false
+- **WebAble target-size check exists:** false
 - **Exact criterion tag:** `wcag2411`
 - **Manual / keyboard / interaction / assistive-technology testing needed:** true / true / true / false
 - **Normative criterion:** [2.4.11 Focus Not Obscured (Minimum)](https://www.w3.org/TR/WCAG22/#focus-not-obscured-minimum)
@@ -942,12 +1159,13 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
 - **Associated axe rules:** none with this criterion tag in axe-core 4.14.0 metadata.
 - **Implemented failure patterns:** none mapped by an enabled, selected rule carrying this criterion's exact tag.
 - **Bounded keyboard/focus checks:**
-  - Hit-testing samples focused-element points for possible complete occlusion.
+  - Samples a 5x5 interior hit-test grid for each keyboard-focused target, records its bounding rectangle and viewport, and identifies layered elements intercepting samples.
+  - Classifies a full-cover candidate as a high-confidence failure only when one layered element covers the entire in-viewport target, intercepts every sample, has a fully opaque computed background and effective opacity of 1, and has no detected clip-path or mask; partial, translucent, clipped, or otherwise ambiguous overlap requires manual review.
 - **Limitations:**
   - No enabled axe rule selected by the current scanner carries this criterion's exact WCAG tag; the listed WebAble probes are separate, bounded evidence and do not establish criterion conformance.
   - A WCAG tag records the axe rule author's criterion association; it is not evidence that the rule covers the full success criterion.
   - The scanner records rule outcomes only when the rule runs and reports them. An absent result does not establish that the criterion passed.
-- **Relevant existing tests:** No focused criterion-specific fixture assertion currently exists.
+- **Relevant existing tests:** `tests/test_capture.py::test_keyboard_audit_reports_focus_obscuration_for_review`, `tests/test_capture.py::test_keyboard_audit_confirms_opaque_full_cover_with_evidence`, `tests/test_capture.py::test_keyboard_audit_classifies_sticky_header_overlap_as_potential`, `tests/test_capture.py::test_keyboard_audit_detects_opaque_dialog_cover`, `tests/test_capture.py::test_keyboard_audit_reports_no_sampled_occlusion_without_overlay`
 - **Outstanding gaps / next step:**
   - Validate the implemented checks with criterion-specific counterexamples against the criterion's Understanding guidance; retain manual review for aspects beyond their bounded scope.
   - No result from this scan may be described as WCAG conformance.
@@ -958,10 +1176,16 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
 - **Level / principle:** A / Operable
 - **Intent:** Provide a single-pointer alternative for multipoint or path-based gestures, except where essential.
 - **Coverage:** `manual_evaluation_required`
+- **Questionnaire question IDs:** `pointer.gesture_alternative`
 - **Automated check exists:** false
 - **Axe check exists:** false
 - **WebAble keyboard/focus check exists:** false
 - **WebAble text/reflow check exists:** false
+- **WebAble text-spacing check exists:** false
+- **WebAble orientation check exists:** false
+- **WebAble non-text contrast check exists:** false
+- **WebAble hover/focus-content check exists:** false
+- **WebAble target-size check exists:** false
 - **Exact criterion tag:** `wcag251`
 - **Manual / keyboard / interaction / assistive-technology testing needed:** true / true / true / false
 - **Normative criterion:** [2.5.1 Pointer Gestures](https://www.w3.org/TR/WCAG22/#pointer-gestures)
@@ -983,10 +1207,16 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
 - **Level / principle:** A / Operable
 - **Intent:** Support at least one specified safeguard against accidental pointer activation.
 - **Coverage:** `manual_evaluation_required`
+- **Questionnaire question IDs:** `pointer.cancellation`
 - **Automated check exists:** false
 - **Axe check exists:** false
 - **WebAble keyboard/focus check exists:** false
 - **WebAble text/reflow check exists:** false
+- **WebAble text-spacing check exists:** false
+- **WebAble orientation check exists:** false
+- **WebAble non-text contrast check exists:** false
+- **WebAble hover/focus-content check exists:** false
+- **WebAble target-size check exists:** false
 - **Exact criterion tag:** `wcag252`
 - **Manual / keyboard / interaction / assistive-technology testing needed:** true / true / true / false
 - **Normative criterion:** [2.5.2 Pointer Cancellation](https://www.w3.org/TR/WCAG22/#pointer-cancellation)
@@ -1008,10 +1238,16 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
 - **Level / principle:** A / Operable
 - **Intent:** Include visible text labels in the accessible names of applicable controls.
 - **Coverage:** `partial`
+- **Questionnaire question IDs:** `widgets.label_in_accessible_name`
 - **Automated check exists:** true
 - **Axe check exists:** true
 - **WebAble keyboard/focus check exists:** false
 - **WebAble text/reflow check exists:** false
+- **WebAble text-spacing check exists:** false
+- **WebAble orientation check exists:** false
+- **WebAble non-text contrast check exists:** false
+- **WebAble hover/focus-content check exists:** false
+- **WebAble target-size check exists:** false
 - **Exact criterion tag:** `wcag253`
 - **Manual / keyboard / interaction / assistive-technology testing needed:** true / false / false / true
 - **Normative criterion:** [2.5.3 Label in Name](https://www.w3.org/TR/WCAG22/#label-in-name)
@@ -1034,10 +1270,16 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
 - **Level / principle:** A / Operable
 - **Intent:** Provide an alternative to functionality triggered by device motion or user gestures, with exceptions.
 - **Coverage:** `manual_evaluation_required`
+- **Questionnaire question IDs:** `motion.actuation_alternative`
 - **Automated check exists:** false
 - **Axe check exists:** false
 - **WebAble keyboard/focus check exists:** false
 - **WebAble text/reflow check exists:** false
+- **WebAble text-spacing check exists:** false
+- **WebAble orientation check exists:** false
+- **WebAble non-text contrast check exists:** false
+- **WebAble hover/focus-content check exists:** false
+- **WebAble target-size check exists:** false
 - **Exact criterion tag:** `wcag254`
 - **Manual / keyboard / interaction / assistive-technology testing needed:** true / true / true / false
 - **Normative criterion:** [2.5.4 Motion Actuation](https://www.w3.org/TR/WCAG22/#motion-actuation)
@@ -1059,10 +1301,16 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
 - **Level / principle:** AA / Operable
 - **Intent:** Provide a single-pointer alternative for functionality that uses dragging, unless dragging is essential.
 - **Coverage:** `manual_evaluation_required`
+- **Questionnaire question IDs:** `dragging.alternative`
 - **Automated check exists:** false
 - **Axe check exists:** false
 - **WebAble keyboard/focus check exists:** false
 - **WebAble text/reflow check exists:** false
+- **WebAble text-spacing check exists:** false
+- **WebAble orientation check exists:** false
+- **WebAble non-text contrast check exists:** false
+- **WebAble hover/focus-content check exists:** false
+- **WebAble target-size check exists:** false
 - **Exact criterion tag:** `wcag257`
 - **Manual / keyboard / interaction / assistive-technology testing needed:** true / true / true / false
 - **Normative criterion:** [2.5.7 Dragging Movements](https://www.w3.org/TR/WCAG22/#dragging-movements)
@@ -1083,11 +1331,17 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
 
 - **Level / principle:** AA / Operable
 - **Intent:** Ensure pointer targets meet minimum size or spacing requirements, subject to exceptions.
-- **Coverage:** `not_implemented`
-- **Automated check exists:** false
+- **Coverage:** `partial`
+- **Questionnaire question IDs:** `controls.target_size_context`, `widgets.target_size_exceptions`
+- **Automated check exists:** true
 - **Axe check exists:** false
 - **WebAble keyboard/focus check exists:** false
 - **WebAble text/reflow check exists:** false
+- **WebAble text-spacing check exists:** false
+- **WebAble orientation check exists:** false
+- **WebAble non-text contrast check exists:** false
+- **WebAble hover/focus-content check exists:** false
+- **WebAble target-size check exists:** true
 - **Exact criterion tag:** `wcag258`
 - **Manual / keyboard / interaction / assistive-technology testing needed:** true / false / false / false
 - **Normative criterion:** [2.5.8 Target Size (Minimum)](https://www.w3.org/TR/WCAG22/#target-size-minimum)
@@ -1095,13 +1349,15 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
 - **Associated axe rules** (all exact WCAG-tagged rules in package metadata):
   - [`target-size`](https://dequeuniversity.com/rules/axe/4.14/target-size?application=axeAPI) — package enabled: `false`; scanner: `selected`; effective: `false`; tags: `cat.sensory-and-visual-cues`, `wcag22aa`, `wcag258`, `EN-301-549v4`, `EN-9.2.5.8`
 - **Implemented failure patterns:** none mapped by an enabled, selected rule carrying this criterion's exact tag.
+- **Bounded target-size checks:**
+  - Measures visible, enabled pointer-target bounding boxes and reports targets narrower or shorter than 24 CSS px for review; WCAG exceptions and actual target spacing are not evaluated.
 - **Limitations:**
-  - No enabled axe rule selected by the current scanner carries this criterion's exact WCAG tag.
+  - No enabled axe rule selected by the current scanner carries this criterion's exact WCAG tag; the listed WebAble probes are separate, bounded evidence and do not establish criterion conformance.
   - A WCAG tag records the axe rule author's criterion association; it is not evidence that the rule covers the full success criterion.
   - The scanner records rule outcomes only when the rule runs and reports them. An absent result does not establish that the criterion passed.
-- **Relevant existing tests:** No focused criterion-specific fixture assertion currently exists.
+- **Relevant existing tests:** `tests/test_capture.py::test_target_size_audit_reports_small_visible_target_for_review`, `tests/test_capture.py::test_target_size_audit_does_not_flag_adequate_target`
 - **Outstanding gaps / next step:**
-  - Design and validate a criterion-specific check or interaction scenario before adding automated coverage; do not infer a pass from the absence of an axe mapping.
+  - Validate the implemented checks with criterion-specific counterexamples against the criterion's Understanding guidance; retain manual review for aspects beyond their bounded scope.
   - No result from this scan may be described as WCAG conformance.
 - **Evidence links:** [1](https://www.w3.org/TR/WCAG22/#target-size-minimum), [2](https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html)
 
@@ -1110,10 +1366,16 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
 - **Level / principle:** A / Understandable
 - **Intent:** Programmatically determine the default human language of each page.
 - **Coverage:** `partial`
+- **Questionnaire question IDs:** `language.parts`
 - **Automated check exists:** true
 - **Axe check exists:** true
 - **WebAble keyboard/focus check exists:** false
 - **WebAble text/reflow check exists:** false
+- **WebAble text-spacing check exists:** false
+- **WebAble orientation check exists:** false
+- **WebAble non-text contrast check exists:** false
+- **WebAble hover/focus-content check exists:** false
+- **WebAble target-size check exists:** false
 - **Exact criterion tag:** `wcag311`
 - **Manual / keyboard / interaction / assistive-technology testing needed:** true / false / false / true
 - **Normative criterion:** [3.1.1 Language of Page](https://www.w3.org/TR/WCAG22/#language-of-page)
@@ -1140,10 +1402,16 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
 - **Level / principle:** AA / Understandable
 - **Intent:** Programmatically identify changes in the language of passages or phrases, with exceptions.
 - **Coverage:** `partial`
+- **Questionnaire question IDs:** `language.parts`
 - **Automated check exists:** true
 - **Axe check exists:** true
 - **WebAble keyboard/focus check exists:** false
 - **WebAble text/reflow check exists:** false
+- **WebAble text-spacing check exists:** false
+- **WebAble orientation check exists:** false
+- **WebAble non-text contrast check exists:** false
+- **WebAble hover/focus-content check exists:** false
+- **WebAble target-size check exists:** false
 - **Exact criterion tag:** `wcag312`
 - **Manual / keyboard / interaction / assistive-technology testing needed:** true / false / false / true
 - **Normative criterion:** [3.1.2 Language of Parts](https://www.w3.org/TR/WCAG22/#language-of-parts)
@@ -1166,10 +1434,16 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
 - **Level / principle:** A / Understandable
 - **Intent:** Avoid a change of context solely because a component receives focus.
 - **Coverage:** `manual_evaluation_required`
+- **Questionnaire question IDs:** `widgets.no_unexpected_change_on_focus`
 - **Automated check exists:** false
 - **Axe check exists:** false
 - **WebAble keyboard/focus check exists:** false
 - **WebAble text/reflow check exists:** false
+- **WebAble text-spacing check exists:** false
+- **WebAble orientation check exists:** false
+- **WebAble non-text contrast check exists:** false
+- **WebAble hover/focus-content check exists:** false
+- **WebAble target-size check exists:** false
 - **Exact criterion tag:** `wcag321`
 - **Manual / keyboard / interaction / assistive-technology testing needed:** true / true / true / false
 - **Normative criterion:** [3.2.1 On Focus](https://www.w3.org/TR/WCAG22/#on-focus)
@@ -1191,10 +1465,16 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
 - **Level / principle:** A / Understandable
 - **Intent:** Avoid unexpected changes of context when changing a user-interface control setting, unless users were advised.
 - **Coverage:** `manual_evaluation_required`
+- **Questionnaire question IDs:** `forms.no_unexpected_change_on_input`
 - **Automated check exists:** false
 - **Axe check exists:** false
 - **WebAble keyboard/focus check exists:** false
 - **WebAble text/reflow check exists:** false
+- **WebAble text-spacing check exists:** false
+- **WebAble orientation check exists:** false
+- **WebAble non-text contrast check exists:** false
+- **WebAble hover/focus-content check exists:** false
+- **WebAble target-size check exists:** false
 - **Exact criterion tag:** `wcag322`
 - **Manual / keyboard / interaction / assistive-technology testing needed:** true / false / true / false
 - **Normative criterion:** [3.2.2 On Input](https://www.w3.org/TR/WCAG22/#on-input)
@@ -1216,10 +1496,16 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
 - **Level / principle:** AA / Understandable
 - **Intent:** Keep repeated navigation mechanisms in a consistent relative order across pages.
 - **Coverage:** `manual_evaluation_required`
+- **Questionnaire question IDs:** `pages.consistent_navigation_order`
 - **Automated check exists:** false
 - **Axe check exists:** false
 - **WebAble keyboard/focus check exists:** false
 - **WebAble text/reflow check exists:** false
+- **WebAble text-spacing check exists:** false
+- **WebAble orientation check exists:** false
+- **WebAble non-text contrast check exists:** false
+- **WebAble hover/focus-content check exists:** false
+- **WebAble target-size check exists:** false
 - **Exact criterion tag:** `wcag323`
 - **Manual / keyboard / interaction / assistive-technology testing needed:** true / false / false / false
 - **Normative criterion:** [3.2.3 Consistent Navigation](https://www.w3.org/TR/WCAG22/#consistent-navigation)
@@ -1241,10 +1527,16 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
 - **Level / principle:** AA / Understandable
 - **Intent:** Identify components with the same functionality consistently across pages.
 - **Coverage:** `manual_evaluation_required`
+- **Questionnaire question IDs:** `pages.consistent_identification`
 - **Automated check exists:** false
 - **Axe check exists:** false
 - **WebAble keyboard/focus check exists:** false
 - **WebAble text/reflow check exists:** false
+- **WebAble text-spacing check exists:** false
+- **WebAble orientation check exists:** false
+- **WebAble non-text contrast check exists:** false
+- **WebAble hover/focus-content check exists:** false
+- **WebAble target-size check exists:** false
 - **Exact criterion tag:** `wcag324`
 - **Manual / keyboard / interaction / assistive-technology testing needed:** true / false / false / false
 - **Normative criterion:** [3.2.4 Consistent Identification](https://www.w3.org/TR/WCAG22/#consistent-identification)
@@ -1266,10 +1558,16 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
 - **Level / principle:** AA / Understandable
 - **Intent:** Keep specified help mechanisms in a consistent relative order across pages.
 - **Coverage:** `manual_evaluation_required`
+- **Questionnaire question IDs:** `pages.consistent_help_location`
 - **Automated check exists:** false
 - **Axe check exists:** false
 - **WebAble keyboard/focus check exists:** false
 - **WebAble text/reflow check exists:** false
+- **WebAble text-spacing check exists:** false
+- **WebAble orientation check exists:** false
+- **WebAble non-text contrast check exists:** false
+- **WebAble hover/focus-content check exists:** false
+- **WebAble target-size check exists:** false
 - **Exact criterion tag:** `wcag326`
 - **Manual / keyboard / interaction / assistive-technology testing needed:** true / false / false / false
 - **Normative criterion:** [3.2.6 Consistent Help](https://www.w3.org/TR/WCAG22/#consistent-help)
@@ -1291,10 +1589,16 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
 - **Level / principle:** A / Understandable
 - **Intent:** Identify input errors and describe them to users in text.
 - **Coverage:** `manual_evaluation_required`
+- **Questionnaire question IDs:** `forms.error_identification`
 - **Automated check exists:** false
 - **Axe check exists:** false
 - **WebAble keyboard/focus check exists:** false
 - **WebAble text/reflow check exists:** false
+- **WebAble text-spacing check exists:** false
+- **WebAble orientation check exists:** false
+- **WebAble non-text contrast check exists:** false
+- **WebAble hover/focus-content check exists:** false
+- **WebAble target-size check exists:** false
 - **Exact criterion tag:** `wcag331`
 - **Manual / keyboard / interaction / assistive-technology testing needed:** true / false / true / true
 - **Normative criterion:** [3.3.1 Error Identification](https://www.w3.org/TR/WCAG22/#error-identification)
@@ -1316,10 +1620,16 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
 - **Level / principle:** A / Understandable
 - **Intent:** Provide labels or instructions when content requires user input.
 - **Coverage:** `partial`
+- **Questionnaire question IDs:** `forms.labels_and_instructions`
 - **Automated check exists:** true
 - **Axe check exists:** true
 - **WebAble keyboard/focus check exists:** false
 - **WebAble text/reflow check exists:** false
+- **WebAble text-spacing check exists:** false
+- **WebAble orientation check exists:** false
+- **WebAble non-text contrast check exists:** false
+- **WebAble hover/focus-content check exists:** false
+- **WebAble target-size check exists:** false
 - **Exact criterion tag:** `wcag332`
 - **Manual / keyboard / interaction / assistive-technology testing needed:** true / false / false / true
 - **Normative criterion:** [3.3.2 Labels or Instructions](https://www.w3.org/TR/WCAG22/#labels-or-instructions)
@@ -1342,10 +1652,16 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
 - **Level / principle:** AA / Understandable
 - **Intent:** Provide correction suggestions when known and appropriate for input errors.
 - **Coverage:** `manual_evaluation_required`
+- **Questionnaire question IDs:** `forms.error_suggestions`
 - **Automated check exists:** false
 - **Axe check exists:** false
 - **WebAble keyboard/focus check exists:** false
 - **WebAble text/reflow check exists:** false
+- **WebAble text-spacing check exists:** false
+- **WebAble orientation check exists:** false
+- **WebAble non-text contrast check exists:** false
+- **WebAble hover/focus-content check exists:** false
+- **WebAble target-size check exists:** false
 - **Exact criterion tag:** `wcag333`
 - **Manual / keyboard / interaction / assistive-technology testing needed:** true / false / true / false
 - **Normative criterion:** [3.3.3 Error Suggestion](https://www.w3.org/TR/WCAG22/#error-suggestion)
@@ -1367,10 +1683,16 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
 - **Level / principle:** AA / Understandable
 - **Intent:** Provide specified safeguards for submissions involving legal commitments, financial transactions, or user-controlled data.
 - **Coverage:** `manual_evaluation_required`
+- **Questionnaire question IDs:** `transactions.error_prevention`
 - **Automated check exists:** false
 - **Axe check exists:** false
 - **WebAble keyboard/focus check exists:** false
 - **WebAble text/reflow check exists:** false
+- **WebAble text-spacing check exists:** false
+- **WebAble orientation check exists:** false
+- **WebAble non-text contrast check exists:** false
+- **WebAble hover/focus-content check exists:** false
+- **WebAble target-size check exists:** false
 - **Exact criterion tag:** `wcag334`
 - **Manual / keyboard / interaction / assistive-technology testing needed:** true / false / true / false
 - **Normative criterion:** [3.3.4 Error Prevention (Legal, Financial, Data)](https://www.w3.org/TR/WCAG22/#error-prevention-legal-financial-data)
@@ -1392,10 +1714,16 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
 - **Level / principle:** A / Understandable
 - **Intent:** Avoid requiring users to re-enter information already supplied in the same process, subject to exceptions.
 - **Coverage:** `manual_evaluation_required`
+- **Questionnaire question IDs:** `forms.repeated_entry`
 - **Automated check exists:** false
 - **Axe check exists:** false
 - **WebAble keyboard/focus check exists:** false
 - **WebAble text/reflow check exists:** false
+- **WebAble text-spacing check exists:** false
+- **WebAble orientation check exists:** false
+- **WebAble non-text contrast check exists:** false
+- **WebAble hover/focus-content check exists:** false
+- **WebAble target-size check exists:** false
 - **Exact criterion tag:** `wcag337`
 - **Manual / keyboard / interaction / assistive-technology testing needed:** true / false / true / false
 - **Normative criterion:** [3.3.7 Redundant Entry](https://www.w3.org/TR/WCAG22/#redundant-entry)
@@ -1417,10 +1745,16 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
 - **Level / principle:** AA / Understandable
 - **Intent:** Avoid requiring a cognitive function test for authentication unless an exception or alternative applies.
 - **Coverage:** `manual_evaluation_required`
+- **Questionnaire question IDs:** `authentication.cognitive_steps`
 - **Automated check exists:** false
 - **Axe check exists:** false
 - **WebAble keyboard/focus check exists:** false
 - **WebAble text/reflow check exists:** false
+- **WebAble text-spacing check exists:** false
+- **WebAble orientation check exists:** false
+- **WebAble non-text contrast check exists:** false
+- **WebAble hover/focus-content check exists:** false
+- **WebAble target-size check exists:** false
 - **Exact criterion tag:** `wcag338`
 - **Manual / keyboard / interaction / assistive-technology testing needed:** true / false / true / false
 - **Normative criterion:** [3.3.8 Accessible Authentication (Minimum)](https://www.w3.org/TR/WCAG22/#accessible-authentication-minimum)
@@ -1442,10 +1776,16 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
 - **Level / principle:** A / Robust
 - **Intent:** Ensure name, role, and state information for user-interface components is programmatically determinable and changeable.
 - **Coverage:** `partial`
+- **Questionnaire question IDs:** `widgets.accessible_name_role_state`
 - **Automated check exists:** true
 - **Axe check exists:** true
 - **WebAble keyboard/focus check exists:** false
 - **WebAble text/reflow check exists:** false
+- **WebAble text-spacing check exists:** false
+- **WebAble orientation check exists:** false
+- **WebAble non-text contrast check exists:** false
+- **WebAble hover/focus-content check exists:** false
+- **WebAble target-size check exists:** false
 - **Exact criterion tag:** `wcag412`
 - **Manual / keyboard / interaction / assistive-technology testing needed:** true / false / false / true
 - **Normative criterion:** [4.1.2 Name, Role, Value](https://www.w3.org/TR/WCAG22/#name-role-value)
@@ -1523,10 +1863,16 @@ The checked-in criterion baseline is `tests/fixtures/wcag22_criteria_source.json
 - **Level / principle:** AA / Robust
 - **Intent:** Make status messages programmatically determinable without requiring focus, using appropriate roles or properties.
 - **Coverage:** `manual_evaluation_required`
+- **Questionnaire question IDs:** `widgets.status_messages`
 - **Automated check exists:** false
 - **Axe check exists:** false
 - **WebAble keyboard/focus check exists:** false
 - **WebAble text/reflow check exists:** false
+- **WebAble text-spacing check exists:** false
+- **WebAble orientation check exists:** false
+- **WebAble non-text contrast check exists:** false
+- **WebAble hover/focus-content check exists:** false
+- **WebAble target-size check exists:** false
 - **Exact criterion tag:** `wcag413`
 - **Manual / keyboard / interaction / assistive-technology testing needed:** true / false / true / true
 - **Normative criterion:** [4.1.3 Status Messages](https://www.w3.org/TR/WCAG22/#status-messages)

@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>One-way keyboard progression block</title>
+</head>
+<body>
+  <button id="before" type="button">Before</button>
+  <button id="blocked-forward" type="button">Forward blocked</button>
+  <button id="after" type="button">After</button>
+  <script>
+    document.addEventListener("keydown", event => {
+      if (event.key === "Tab" && !event.shiftKey &&
+          event.target.id === "blocked-forward") {
+        event.preventDefault();
+      }
+    }, true);
+  </script>
+</body>
+</html>

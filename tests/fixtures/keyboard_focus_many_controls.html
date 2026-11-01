@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Many sequential keyboard controls</title>
+</head>
+<body>
+  <main id="controls"></main>
+  <script>
+    const container = document.getElementById("controls");
+    for (let index = 1; index <= 24; index += 1) {
+      const button = document.createElement("button");
+      button.id = index === 24 ? "last-control" : `control-${index}`;
+      button.type = "button";
+      button.textContent = `Control ${index}`;
+      container.append(button);
+    }
+  </script>
+</body>
+</html>

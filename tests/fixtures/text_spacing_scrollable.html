@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Text spacing scrollable region fixture</title>
+  <style>
+    #scroll-region {
+      width: 180px;
+      overflow-x: auto;
+      white-space: nowrap;
+      border: 1px solid #000;
+    }
+    #long-content {
+      display: inline-block;
+      font: 16px/1 sans-serif;
+    }
+  </style>
+</head>
+<body>
+  <div id="scroll-region">
+    <span id="long-content">A deliberately long horizontally scrollable text sequence</span>
+  </div>
+</body>
+</html>

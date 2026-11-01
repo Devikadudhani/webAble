@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Compliant hover and focus content</title>
+  <style>
+    body { font: 16px sans-serif; padding: 24px; }
+    .tooltip-wrapper { position: relative; display: inline-block; }
+    #tip {
+      display: none;
+      position: absolute;
+      z-index: 2;
+      top: 100%;
+      left: 0;
+      width: 220px;
+      padding: 12px;
+      background: #fff4cc;
+      border: 1px solid #554400;
+    }
+    #help:hover + #tip,
+    #tip:hover,
+    #help:focus + #tip { display: block; }
+    #tip.dismissed { display: none !important; }
+    #page-copy { margin-top: 100px; }
+  </style>
+</head>
+<body>
+  <span class="tooltip-wrapper">
+    <button id="help" aria-describedby="tip">Help</button>
+    <div id="tip" role="tooltip">Additional help text stays available on hover or focus.</div>
+  </span>
+  <p id="page-copy">Page content remains available around the tooltip.</p>
+  <script>
+    document.addEventListener("pointerenter", event => {
+      if (event.target.id === "help") {
+        document.querySelector("#tip").classList.remove("dismissed");
+      }
+    }, true);
+    document.querySelector("#help").addEventListener("focus", () => {
+      document.querySelector("#tip").classList.remove("dismissed");
+    });
+    document.addEventListener("keydown", event => {
+      if (event.key === "Escape") {
+        document.querySelector("#tip").classList.add("dismissed");
+      }
+    });
+  </script>
+</body>
+</html>

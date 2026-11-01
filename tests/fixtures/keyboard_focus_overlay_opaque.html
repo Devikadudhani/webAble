@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Opaque focus overlay fixture</title>
+  <style>
+    #opaque-cover {
+      position: fixed;
+      inset: 0;
+      z-index: 99;
+      background: #000;
+    }
+  </style>
+</head>
+<body>
+  <button id="covered" type="button">Covered control</button>
+  <div id="opaque-cover" aria-hidden="true"></div>
+</body>
+</html>

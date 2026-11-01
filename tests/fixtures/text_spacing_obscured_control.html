@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Text spacing obscured control fixture</title>
+  <style>
+    p { margin: 0; line-height: 16px; }
+    #continue { display: block; width: 140px; height: 24px; }
+    #cover {
+      position: fixed;
+      left: 0;
+      top: 50px;
+      width: 240px;
+      height: 60px;
+      z-index: 20;
+      background: #ddd;
+    }
+  </style>
+</head>
+<body>
+  <p id="intro">Short introductory line</p>
+  <button id="continue" type="button">Continue</button>
+  <div id="cover" aria-hidden="true"></div>
+</body>
+</html>

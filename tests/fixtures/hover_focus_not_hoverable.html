@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Hover content that cannot be entered</title>
+  <style>
+    body { font: 16px sans-serif; padding: 24px; }
+    #trigger { position: relative; }
+    #tip {
+      display: none;
+      position: absolute;
+      top: 38px;
+      left: 0;
+      width: 220px;
+      padding: 12px;
+      background: #fff4cc;
+      pointer-events: none;
+    }
+    #trigger:hover + #tip { display: block; }
+  </style>
+</head>
+<body>
+  <button id="trigger">Show details</button>
+  <div id="tip" role="tooltip">This content disappears when the pointer leaves the trigger.</div>
+</body>
+</html>

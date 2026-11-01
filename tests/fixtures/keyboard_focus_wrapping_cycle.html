@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Keyboard focus wrapping cycle</title>
+</head>
+<body>
+  <section role="dialog" aria-label="Example dialog">
+    <button id="first-in-cycle" type="button">First</button>
+    <button id="second-in-cycle" type="button">Second</button>
+  </section>
+  <script>
+    const first = document.getElementById("first-in-cycle");
+    const second = document.getElementById("second-in-cycle");
+    document.addEventListener("keydown", event => {
+      if (event.key !== "Tab") return;
+      if (!event.shiftKey && event.target === second) {
+        event.preventDefault();
+        first.focus();
+      } else if (event.shiftKey && event.target === first) {
+        event.preventDefault();
+        second.focus();
+      }
+    }, true);
+  </script>
+</body>
+</html>
