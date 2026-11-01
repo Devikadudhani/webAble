@@ -73,6 +73,8 @@ from app.capture.responsive import (
     ViewportCaptureResult,
     capture_responsive_viewports,
 )
+from app.capture.models import NavigationStatus, ReadinessStatus
+from app.analyzers.scoring import build_audit_scoring
 from app.capture.runner import BrowserCapture, BrowserCaptureError
 from app.capture.storage import LocalScreenshotStorage
 from app.capture.url_safety import PublicURLSafetyValidator, UnsafeURL
@@ -419,6 +421,22 @@ class TargetSizeAuditSchema(BaseModel):
     details: list[str]
 
 
+class FailedRequestSchema(BaseModel):
+    url: str
+    resource_type: str
+    error: str | None
+
+
+class TechnicalEvidenceSchema(BaseModel):
+    status: Literal["available", "partial", "unavailable", "not_tested"]
+    navigation_status: NavigationStatus | None
+    readiness_status: ReadinessStatus | None
+    console_errors: list[str]
+    runtime_errors: list[str]
+    failed_requests: list[FailedRequestSchema]
+    details: list[str]
+
+
 class BrowserFeatureEvidenceSchema(BaseModel):
     feature_id: str
     detected: bool
@@ -431,6 +449,87 @@ class BrowserFeatureDiscoverySchema(BaseModel):
     status: Literal["available", "partial", "unavailable", "not_attempted"]
     features: list[BrowserFeatureEvidenceSchema]
     details: list[str]
+
+
+class ScoringDimensionSchema(BaseModel):
+    dimension_id: str
+    name: str
+    weight: float
+    implemented: bool
+    score: float | None
+    coverage_percentage: float | None
+    total_applicable_criteria: int
+    conclusive_criteria: int
+    passed_criteria: int
+    failed_criteria: int
+    needs_review_criteria: int
+    not_tested_criteria: int
+    not_applicable_criteria: int
+    unsupported_criteria: int
+    error_criteria: int
+    coverage_label: str
+    score_label: str | None
+    scoring_status: str
+    description: str
+
+
+class ScoringCriterionEvidenceSchema(BaseModel):
+    evidence_id: str
+    analyzer_id: str
+    reference: str | None
+    status: str
+    viewports: list[str]
+    details: str | None
+    data: dict | list | str | int | float | bool | None
+    confidence: str | None
+
+
+class ScoringViewportResultSchema(BaseModel):
+    viewport: str
+    status: str
+    analyzer_id: str | None = None
+    reference: str | None = None
+    details: str | None = None
+    limitations: list[str] = Field(default_factory=list)
+
+
+class ScoringCriterionSchema(BaseModel):
+    criterion_id: str
+    criterion_name: str
+    dimension: str
+    status: str
+    weight: float
+    tested_viewports: list[str]
+    affected_viewports: list[str]
+    evidence_count: int
+    failure_count: int
+    review_count: int
+    confidence: str | None
+    evidence: list[ScoringCriterionEvidenceSchema]
+    limitations: list[str]
+    analyzer_ids: list[str]
+    viewport_results: list[ScoringViewportResultSchema]
+    description: str
+    applicable_conditions: str | None
+
+
+class ExcludedDimensionSchema(BaseModel):
+    dimension_id: str
+    reason: str
+
+
+class AuditScoringSchema(BaseModel):
+    overall_score: float | None
+    overall_score_type: Literal["full_audit_score", "partial_audit_score"]
+    overall_coverage: float | None
+    overall_scoring_status: str
+    included_dimensions: list[str]
+    excluded_dimensions: list[ExcludedDimensionSchema]
+    overall_score_label: str | None
+    dimensions: list[ScoringDimensionSchema]
+    criteria: list[ScoringCriterionSchema]
+    scoring_configuration_version: str
+    limitations: list[str]
 
 
 class NormalizedFindingsSchema(BaseModel):
@@ -516,6 +615,7 @@ class ResponsiveViewportResponse(BaseModel):
     keyboard_focus_audit: KeyboardFocusAuditSchema
     text_reflow_audit: TextReflowAuditSchema
     target_size_audit: TargetSizeAuditSchema
+    technical_evidence: TechnicalEvidenceSchema
     browser_feature_discovery: BrowserFeatureDiscoverySchema
     finding_normalization: NormalizedFindingsSchema
     screenshot_ref: str | None
@@ -528,6 +628,7 @@ class ResponsiveCaptureResponse(BaseModel):
     hybrid_evaluation: dict
     audit_findings: AuditFindingAggregationSchema
     audit_summary: AuditSummarySchema
+    scoring: AuditScoringSchema
 
     @classmethod
     def from_results(
@@ -577,9 +678,11 @@ class ResponsiveCaptureResponse(BaseModel):
             ),
             free_text=accessibility_context.free_text,
         )
+        scoring = build_audit_scoring(results)
         return cls(
             requested_url=requested_url,
             hybrid_evaluation=hybrid_evaluation,
+            scoring=AuditScoringSchema(**scoring),
             audit_summary=AuditSummarySchema(
                 status=summary.status,
                 horizontal_overflow_detected=summary.horizontal_overflow_detected,
@@ -743,6 +846,9 @@ class ResponsiveCaptureResponse(BaseModel):
                             for finding in result.target_size_audit.findings
                         ],
                         details=result.target_size_audit.details,
+                    ),
+                    technical_evidence=TechnicalEvidenceSchema(
+                        **asdict(result.technical_evidence)
                     ),
                     browser_feature_discovery=BrowserFeatureDiscoverySchema(
                         status=result.browser_feature_discovery.status,

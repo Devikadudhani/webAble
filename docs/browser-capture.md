@@ -504,6 +504,25 @@ overwrites the other. `compliance_conclusion` remains unset, owner answers carry
 `verified: false`, and criteria without evidence are `not_evaluated`, never
 implicitly passed.
 
+The capture response also exposes a top-level `scoring` summary. Its versioned
+registry is centralized in `app/analyzers/scoring.py`; each criterion includes
+its normalized status, configured weight, viewport results, evidence references,
+confidence, and limitations. Evidence from multiple viewports is aggregated at
+the criterion level while retaining viewport-specific results. `fail` takes
+precedence over other viewport outcomes; missing or inconclusive evidence is
+never treated as a pass; observed console errors require review rather than being
+treated as definitive failures. Unsupported capabilities (including forms,
+executed journeys, and visual/UX quality) are identified but excluded from scoring.
+
+Dimension scores use only conclusive `pass`/`fail` criteria, and are withheld
+when their evidence coverage is below 40%. The weighted overall score is
+reported as `partial_audit_score`, since visual/UX quality is not implemented;
+it is withheld when overall coverage is below 40%. The score and coverage labels
+are summaries of the configured checks, not WCAG conformance, a severity ranking,
+or a measure of total website quality. Existing per-viewport analyzer results
+remain in the response as the source evidence, and `scoring.limitations`
+describes the bounds of interpretation.
+
 The capture API is currently stateless: questionnaire answers are scoped to the
 request/response and are not durably stored across audits. Deployments should add
 authenticated, access-controlled persistence and an explicit retention policy

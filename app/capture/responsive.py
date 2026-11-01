@@ -43,6 +43,9 @@ from app.analyzers.horizontal_overflow import (
 from app.capture.models import (
     BrowserEvidence,
     CaptureOutcome,
+    FailedRequest,
+    NavigationStatus,
+    ReadinessStatus,
     ViewportDimensions,
 )
 from app.capture.runner import BrowserCaptureError, PageCallback
@@ -72,6 +75,20 @@ OverflowAnalysisStatus = Literal[
 ]
 ElementDiagnosisStatus = Literal["available", "unavailable", "not_attempted"]
 FindingNormalizationStatus = Literal["available", "unavailable", "not_attempted"]
+TechnicalEvidenceStatus = Literal[
+    "available", "partial", "unavailable", "not_tested"
+]
+
+
+@dataclass(frozen=True)
+class TechnicalEvidenceResult:
+    status: TechnicalEvidenceStatus = "not_tested"
+    navigation_status: NavigationStatus | None = None
+    readiness_status: ReadinessStatus | None = None
+    console_errors: list[str] = field(default_factory=list)
+    runtime_errors: list[str] = field(default_factory=list)
+    failed_requests: list[FailedRequest] = field(default_factory=list)
+    details: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -129,6 +146,9 @@ class ViewportCaptureResult:
             details=["Target-size audit was not attempted."],
         )
     )
+    technical_evidence: TechnicalEvidenceResult = field(
+        default_factory=TechnicalEvidenceResult
+    )
     browser_feature_discovery: BrowserFeatureDiscovery = field(
         default_factory=lambda: BrowserFeatureDiscovery(
             status="not_attempted",
@@ -177,6 +197,10 @@ async def capture_responsive_viewports(
                     details=[
                         "Capture was not attempted because the URL was prohibited."
                     ],
+                    technical_evidence=TechnicalEvidenceResult(
+                        status="not_tested",
+                        details=["The requested page was prohibited and not captured."],
+                    ),
                 )
             )
             continue
@@ -316,6 +340,10 @@ async def capture_responsive_viewports(
                         details=["Normalization was not attempted because capture failed."],
                     ),
                     details=[str(error)],
+                    technical_evidence=TechnicalEvidenceResult(
+                        status="not_tested",
+                        details=["The requested page was prohibited and not captured."],
+                    ),
                 )
             )
             stop_after_unsafe_url = True
@@ -338,6 +366,10 @@ async def capture_responsive_viewports(
                         details=["Normalization was not attempted because capture failed."],
                     ),
                     details=[f"Capture failed: {str(error)[:300]}"],
+                    technical_evidence=TechnicalEvidenceResult(
+                        status="unavailable",
+                        details=[f"Capture failed ({type(error).__name__})."],
+                    ),
                 )
             )
             continue
@@ -359,6 +391,10 @@ async def capture_responsive_viewports(
                         details=["Normalization was not attempted because capture failed."],
                     ),
                     details=[f"Capture failed ({type(error).__name__})."],
+                    technical_evidence=TechnicalEvidenceResult(
+                        status="unavailable",
+                        details=[f"Capture failed ({type(error).__name__})."],
+                    ),
                 )
             )
             continue
@@ -367,6 +403,15 @@ async def capture_responsive_viewports(
         capture_is_complete = (
             evidence.outcome == "completed"
             and evidence.readiness_status == "ready"
+        )
+        technical_evidence = TechnicalEvidenceResult(
+            status="available" if capture_is_complete else "partial",
+            navigation_status=evidence.navigation_status,
+            readiness_status=evidence.readiness_status,
+            console_errors=list(evidence.console_errors),
+            runtime_errors=list(evidence.uncaught_page_errors),
+            failed_requests=list(evidence.failed_requests),
+            details=list(evidence.details),
         )
         if capture_is_complete and evidence.screenshot_ref:
             text_reflow = replace(
@@ -471,6 +516,7 @@ async def capture_responsive_viewports(
                 text_reflow_audit=text_reflow,
                 target_size_audit=target_size,
                 browser_feature_discovery=feature_discovery,
+                technical_evidence=technical_evidence,
             )
         )
 

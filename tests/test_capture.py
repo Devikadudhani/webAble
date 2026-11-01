@@ -238,7 +238,23 @@ def test_capture_endpoint_returns_200_for_local_fixture(
             },
         )
     assert response.status_code == 200
-    viewports = response.json()["viewports"]
+    response_body = response.json()
+    scoring = response_body["scoring"]
+    assert scoring["scoring_configuration_version"] == "1.0.0"
+    assert scoring["overall_score_type"] == "partial_audit_score"
+    assert {dimension["dimension_id"] for dimension in scoring["dimensions"]} == {
+        "accessibility",
+        "responsive_quality",
+        "functional_reliability",
+        "technical_reliability",
+        "visual_ux",
+    }
+    assert next(
+        criterion
+        for criterion in scoring["criteria"]
+        if criterion["criterion_id"] == "functional.forms"
+    )["status"] == "unsupported"
+    viewports = response_body["viewports"]
     assert [item["name"] for item in viewports] == ["desktop", "tablet", "mobile"]
     assert [item["viewport"] for item in viewports] == [
         {"width": 1365, "height": 768},
@@ -253,6 +269,7 @@ def test_capture_endpoint_returns_200_for_local_fixture(
     assert all("functional_ux_audit" in item for item in viewports)
     assert all(item["functional_ux_audit"]["status"] == "available" for item in viewports)
     assert all("accessibility_scan" in item for item in viewports)
+    assert all("technical_evidence" in item for item in viewports)
     assert all(item["accessibility_scan"]["status"] == "available" for item in viewports)
     assert all(item["accessibility_scan"]["axe_version"] == "4.14.0" for item in viewports)
     assert all("text_reflow_audit" in item for item in viewports)
