@@ -55,6 +55,24 @@ If a capture still returns HTTP 502/503/504 after redeploying, check Render's
 runtime logs for a process restart, memory exhaustion, or timeout at that time;
 the frontend cannot recover a report from a terminated server process.
 
+## Concurrent audits
+
+The dashboard submits `POST /captures/jobs` and polls `GET /captures/jobs/{id}`
+every two seconds. Audits wait for a browser slot without holding a long HTTP
+request open. The execution timeout starts after acquiring a slot. The existing
+`POST /captures` endpoint remains available for synchronous clients.
+
+`WEBABLE_MAX_CONCURRENT_CAPTURES` defaults to `1` to limit browser memory usage;
+increase it only when the host has sufficient CPU and RAM. Up to
+`WEBABLE_MAX_PENDING_CAPTURES` audits (default `20`, including running work) are
+accepted; a full queue returns HTTP 429. Results expire after 15 minutes and at
+most 100 reports are retained.
+
+This queue is in memory: run **one Uvicorn worker and one service instance**.
+Restarts discard jobs. Use a persistent shared job queue and result store before
+enabling multiple workers, replicas, or serverless hosting. This implementation
+is intended for the Docker/Render service above.
+
 ## Verify
 
 ```sh

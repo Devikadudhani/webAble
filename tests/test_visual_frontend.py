@@ -33,7 +33,9 @@ def test_actual_capture_visualizations_and_responsive_layout(fixture_server, tmp
             page.on("pageerror", lambda error: errors.append(str(error)))
             await page.add_init_script("""(({questionnaire, response}) => {
               window.fetch = async url => ({ok: true, json: async () =>
-                url === '/accessibility/questionnaire' ? questionnaire : response});
+                url === '/accessibility/questionnaire' ? questionnaire
+                : url === '/captures/jobs' ? {job_id: 'test'}
+                : {status: 'completed', result: response}});
             })(""" + json.dumps({"questionnaire": questionnaire, "response": response}) + ");")
             await mount_react(page)
             await page.screenshot(path="/tmp/webable-landing.png", full_page=True)

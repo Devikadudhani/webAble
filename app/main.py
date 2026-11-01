@@ -1,6 +1,9 @@
 import asyncio
 import os
 import sys
+import time
+import logging
+from uuid import uuid4
 from dataclasses import asdict
 from pathlib import Path
 from typing import Literal
@@ -99,7 +102,11 @@ CAPTURE_TIMEOUT_SECONDS = (
     / 1_000
     + 15
 )
-MAX_CONCURRENT_CAPTURES = max(1, int(os.getenv("WEBABLE_MAX_CONCURRENT_CAPTURES", "2")))
+MAX_CONCURRENT_CAPTURES = max(1, int(os.getenv("WEBABLE_MAX_CONCURRENT_CAPTURES", "1")))
+MAX_PENDING_CAPTURES = max(1, int(os.getenv("WEBABLE_MAX_PENDING_CAPTURES", "20")))
+JOB_RETENTION_SECONDS = 900
+capture_jobs: dict[str, dict] = {}
+capture_tasks: set[asyncio.Task] = set()
 
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(
@@ -990,21 +997,19 @@ async def create_capture(request: CaptureRequest) -> ResponsiveCaptureResponse:
     try:
         await url_validator.validate(request.url)
 
-        async def run_responsive_capture():
-            async with capture_slots:
-                return await capture_responsive_viewports(
+        # Queue waiting must not consume the browser execution time budget.
+        async with capture_slots:
+            results = await asyncio.wait_for(
+                capture_responsive_viewports(
                     request.url,
                     capture_service.capture,
                     destination_validator=url_validator,
                     scenario_screenshot_capture=(
                         capture_service.save_scenario_screenshot
                     ),
-                )
-
-        results = await asyncio.wait_for(
-            run_responsive_capture(),
-            timeout=CAPTURE_TIMEOUT_SECONDS,
-        )
+                ),
+                timeout=CAPTURE_TIMEOUT_SECONDS,
+            )
     except UnsafeURL as error:
         raise HTTPException(
             status_code=400,
@@ -1040,6 +1045,49 @@ async def create_capture(request: CaptureRequest) -> ResponsiveCaptureResponse:
         results,
         accessibility_context=request.accessibility_context,
     )
+
+
+async def _run_capture_job(job_id: str, request: CaptureRequest) -> None:
+    job = capture_jobs[job_id]
+    try:
+        result = await create_capture(request)
+        job.update(status="completed", result=result.model_dump(mode="json"))
+    except HTTPException as error:
+        job.update(status="failed", error=error.detail)
+    except Exception:
+        logging.getLogger(__name__).exception("Audit job failed: %s", job_id)
+        job.update(status="failed", error={"detail": "The audit failed. Please try again."})
+    finally:
+        job["finished_at"] = time.monotonic()
+
+
+@app.post("/captures/jobs", status_code=202)
+async def submit_capture_job(request: CaptureRequest) -> dict:
+    now = time.monotonic()
+    for job_id, job in list(capture_jobs.items()):
+        if job.get("finished_at") is not None and now - job["finished_at"] > JOB_RETENTION_SECONDS:
+            del capture_jobs[job_id]
+    if sum(job["status"] == "pending" for job in capture_jobs.values()) >= MAX_PENDING_CAPTURES:
+        raise HTTPException(429, "The audit queue is full. Please try again shortly.", headers={"Retry-After": "10"})
+    # Bound retained reports as well as queued work.
+    if len(capture_jobs) >= 100:
+        completed = next((key for key, job in capture_jobs.items() if job["status"] != "pending"), None)
+        if completed is not None:
+            del capture_jobs[completed]
+    job_id = uuid4().hex
+    capture_jobs[job_id] = {"status": "pending"}
+    task = asyncio.create_task(_run_capture_job(job_id, request))
+    capture_tasks.add(task)
+    task.add_done_callback(capture_tasks.discard)
+    return {"job_id": job_id, "status": "pending"}
+
+
+@app.get("/captures/jobs/{job_id}")
+async def get_capture_job(job_id: str) -> dict:
+    job = capture_jobs.get(job_id)
+    if job is None or (job.get("finished_at") is not None and time.monotonic() - job["finished_at"] > JOB_RETENTION_SECONDS):
+        raise HTTPException(404, "This audit expired or the server restarted. Please start a new audit.")
+    return {key: value for key, value in job.items() if key != "finished_at"}
 
 
 @app.get("/accessibility/questionnaire")

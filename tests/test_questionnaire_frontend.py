@@ -68,8 +68,9 @@ def test_capture_proxy_errors_allow_retry_without_json_parse_errors():
                 if (url === '/accessibility/questionnaire') {
                     return Response.json({features: [], conditional_questions: []});
                 }
+                if (window.__retry && url === '/captures/jobs') return Response.json({job_id: 'test'});
                 return window.__retry
-                    ? Response.json({requested_url: 'https://example.test', viewports: []})
+                    ? Response.json({status: 'completed', result: {requested_url: 'https://example.test', viewports: []}})
                     : new Response('', {status: 502});
             };""")
             await mount_react(page)
@@ -194,8 +195,11 @@ def test_adaptive_frontend_preserves_answers_and_distinguishes_evidence():
                   if (url === "/accessibility/questionnaire") {
                     return {ok: true, json: async () => questionnaire};
                   }
-                  window.__requests.push(JSON.parse(options.body));
-                  return {ok: true, json: async () => auditResponse};
+                  if (url === '/captures/jobs') {
+                    window.__requests.push(JSON.parse(options.body));
+                    return Response.json({job_id: 'test'});
+                  }
+                  return Response.json({status: 'completed', result: auditResponse});
                 };
                 })(""" + json.dumps({"questionnaire": questionnaire, "auditResponse": audit_response}) + ");"
             )
@@ -314,7 +318,8 @@ def test_dashboard_filters_safe_evidence_partial_states_and_mobile_keyboard():
                 window.fetch = async (url) => url === '/accessibility/questionnaire'
                     ? {ok: true, json: async () => ({features: [], conditional_questions: []})}
                     : window.__fail ? {ok: false, json: async () => ({detail: 'Capture failed'})}
-                    : {ok: true, json: async () => window.__response};
+                    : url === '/captures/jobs' ? Response.json({job_id: 'test'})
+                    : Response.json({status: 'completed', result: window.__response});
             })(""" + json.dumps(response) + ");")
             await mount_react(page)
             await page.locator("#audit-url").fill("https://example.test")

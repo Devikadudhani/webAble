@@ -1,6 +1,32 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readApiResponse } from "../frontend/src/api.mjs";
+import { readApiResponse, runAudit } from "../frontend/src/api.mjs";
+
+test("audits poll pending jobs and return their report", async () => {
+  const calls = [];
+  const responses = [
+    { job_id: "abc" }, { status: "pending" },
+    { status: "completed", result: { viewports: [] } },
+  ];
+  const result = await runAudit({ url: "https://example.com" }, {
+    pause: async () => {},
+    fetcher: async (url, options) => {
+      calls.push({ url, options });
+      return Response.json(responses.shift());
+    },
+  });
+  assert.deepEqual(result, { viewports: [] });
+  assert.deepEqual(calls.map(call => call.url), ["/captures/jobs", "/captures/jobs/abc", "/captures/jobs/abc"]);
+  assert.equal(calls[0].options.method, "POST");
+});
+
+test("failed audits surface the server error", async () => {
+  const responses = [{ job_id: "abc" }, { status: "failed", error: { detail: "Browser failed" } }];
+  await assert.rejects(runAudit({}, {
+    pause: async () => {},
+    fetcher: async () => Response.json(responses.shift()),
+  }), /Browser failed/);
+});
 
 test("empty and HTML proxy errors preserve the HTTP status", async () => {
   for (const body of ["", "<html>Bad gateway</html>"]) {

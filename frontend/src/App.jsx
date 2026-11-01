@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Header, AuditForm, AuditLoading } from "./components/AuditForm";
 import ResultsDashboard from "./components/ResultsDashboard";
 import { buildRequest, list } from "./utils";
-import { readApiResponse } from "./api.mjs";
+import { readApiResponse, runAudit } from "./api.mjs";
 const empty = () => ({
   url: "",
   pages: "",
@@ -62,12 +62,7 @@ export default function App() {
     setLoading(true);
     setError("");
     try {
-      const r = await fetch("/captures", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(buildRequest(form, answers)),
-      });
-      const result = await readApiResponse(r, "The audit request");
+      const result = await runAudit(buildRequest(form, answers));
       setResponse(result);
       setQuestions((old) => [
         ...new Map(

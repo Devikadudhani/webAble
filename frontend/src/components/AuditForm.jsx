@@ -250,9 +250,9 @@ export function AuditLoading() {
   return (
     <section id="audit-loading" className="panel" role="status">
       <p className="eyebrow">AUDIT IN PROGRESS</p>
-      <h2>Running audit</h2>
+      <h2>Waiting for your audit results</h2>
       <div className="indeterminate" aria-hidden="true" />
-      <p>Checks run on the server. Live stage progress is not available.</p>
+      <p>Your audit may be queued while other audits finish. Checks run on the server; you can keep this page open for the results.</p>
       <ul className="stages">
         {[
           "Opening website",
