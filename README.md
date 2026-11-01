@@ -33,6 +33,16 @@ python run_server.py
 
 Open http://127.0.0.1:8000/. The build writes React assets into `app/static`, which FastAPI already serves. Rebuild after frontend changes. No separate Node server is required in production. Alternatively deploy `app/static` on a static host and reverse-proxy `/accessibility` and `/captures` to FastAPI on the same origin.
 
+## Deploy on Render with Docker
+
+Create a Render Web Service using the repository root as its Docker build context.
+The root `Dockerfile` builds the React frontend, installs the Playwright Chromium
+runtime, and copies the pinned axe-core script into the location used by the
+backend. Leave the build command empty; the Dockerfile handles the build and
+starts Uvicorn on Render's assigned port. Deploy the latest commit containing the
+Dockerfile. If a capture returns a report without accessibility evidence, check
+the viewport's accessibility scan status and details in the report.
+
 ## Verify
 
 ```sh
