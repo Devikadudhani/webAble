@@ -1,4 +1,5 @@
 import asyncio
+import struct
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -602,7 +603,16 @@ def _run_keyboard_audit(fixture_server, path):
     return asyncio.run(run())
 
 
-def _run_text_reflow_audit(fixture_server, path, *, width=1365, height=768):
+def _run_text_reflow_audit(
+    fixture_server,
+    path,
+    *,
+    width=1365,
+    height=768,
+    viewport_name="test",
+    capture_id=None,
+    capture_screenshot=None,
+):
     async def run():
         async with async_playwright() as playwright:
             browser = await playwright.chromium.launch()
@@ -612,12 +622,26 @@ def _run_text_reflow_audit(fixture_server, path, *, width=1365, height=768):
                 if path == "text-reflow-dynamic":
                     await page.wait_for_timeout(300)
                 return await audit_text_reflow(
-                    page, baseline_width=width, baseline_height=height
+                    page,
+                    baseline_width=width,
+                    baseline_height=height,
+                    viewport_name=viewport_name,
+                    capture_id=capture_id,
+                    capture_screenshot=capture_screenshot,
                 )
             finally:
                 await browser.close()
 
     return asyncio.run(run())
+
+
+def _scenario_screenshot_capture(storage):
+    screenshot_capture_service = BrowserCapture(
+        storage=storage,
+        url_validator=LocalhostValidator(),
+        settling_period_ms=0,
+    )
+    return screenshot_capture_service.save_scenario_screenshot
 
 
 def test_text_reflow_usable_fixture_has_no_detected_clipping(fixture_server):
@@ -754,6 +778,234 @@ def test_text_reflow_ellipsis_disclosure_and_nested_sizes_need_review(fixture_se
     assert all(finding.classification != "violation" for finding in findings.values())
 
 
+def test_suspicious_text_scenario_shares_one_screenshot_and_preserves_baseline(
+    fixture_server, tmp_path
+):
+    storage = LocalScreenshotStorage(tmp_path)
+    baseline_ref = storage.save(b"baseline screenshot")
+    baseline_path = tmp_path / baseline_ref
+    baseline_bytes = baseline_path.read_bytes()
+    save_screenshot = _scenario_screenshot_capture(storage)
+    saved_scenarios = []
+
+    async def record_screenshot(
+        page, capture_id, viewport_name, scenario_id, width, height
+    ):
+        saved_scenarios.append((viewport_name, scenario_id))
+        return await save_screenshot(
+            page,
+            capture_id=capture_id,
+            viewport_name=viewport_name,
+            scenario_id=scenario_id,
+            width=width,
+            height=height,
+        )
+
+    result = _run_text_reflow_audit(
+        fixture_server,
+        "text-reflow-review",
+        viewport_name="desktop",
+        capture_id="capture01",
+        capture_screenshot=record_screenshot,
+    )
+    scenario = next(
+        item for item in result.scenarios if item.scenario_id == "text_200_percent"
+    )
+
+    assert len(scenario.findings) > 1
+    assert scenario.screenshot_ref is not None
+    assert {finding.screenshot_ref for finding in scenario.findings} == {
+        scenario.screenshot_ref
+    }
+    assert saved_scenarios.count(("desktop", "text_200_percent")) == 1
+    screenshot_path = tmp_path / scenario.screenshot_ref
+    image = screenshot_path.read_bytes()
+    assert image[:8] == b"\x89PNG\r\n\x1a\n"
+    assert struct.unpack(">II", image[16:24]) == (1365, 768)
+    assert "scenario_capture01_desktop_text_200_percent_1365x768.png" in str(
+        screenshot_path
+    )
+    assert baseline_path.read_bytes() == baseline_bytes
+
+
+def test_text_reflow_measurements_do_not_require_screenshot_capture(fixture_server):
+    result = _run_text_reflow_audit(fixture_server, "text-reflow-clipped")
+    scenario = next(
+        item for item in result.scenarios if item.scenario_id == "text_200_percent"
+    )
+
+    assert scenario.status == "completed"
+    assert scenario.measurement is not None
+    assert scenario.findings
+    assert scenario.screenshot_ref is None
+    assert all(finding.screenshot_ref is None for finding in scenario.findings)
+
+    screenshot_calls = []
+
+    async def record_screenshot(*args, **kwargs):
+        screenshot_calls.append((args, kwargs))
+        return "unexpected.png"
+
+    usable_result = _run_text_reflow_audit(
+        fixture_server,
+        "text-reflow-usable",
+        capture_screenshot=record_screenshot,
+    )
+    usable_scenario = next(
+        item for item in usable_result.scenarios
+        if item.scenario_id == "text_200_percent"
+    )
+    assert usable_scenario.measurement is not None
+    assert usable_scenario.findings == []
+    assert usable_scenario.screenshot_ref is None
+    assert screenshot_calls == []
+
+
+def test_reflow_screenshots_match_320_and_applicable_256_viewports(
+    fixture_server, tmp_path
+):
+    storage = LocalScreenshotStorage(tmp_path)
+    save_screenshot = _scenario_screenshot_capture(storage)
+
+    def run_with_screenshots(path, *, width, height, viewport_name):
+        return _run_text_reflow_audit(
+            fixture_server,
+            path,
+            width=width,
+            height=height,
+            viewport_name=viewport_name,
+            capture_id=f"{viewport_name}scan",
+            capture_screenshot=save_screenshot,
+        )
+
+    wide_result = run_with_screenshots(
+        "text-reflow-wide",
+        width=1365,
+        height=768,
+        viewport_name="desktop",
+    )
+    narrow_scenario = next(
+        item for item in wide_result.scenarios
+        if item.scenario_id == "reflow_320_css_px"
+    )
+    assert narrow_scenario.findings
+    assert narrow_scenario.screenshot_ref is not None
+    narrow_image = (tmp_path / narrow_scenario.screenshot_ref).read_bytes()
+    assert struct.unpack(">II", narrow_image[16:24]) == (320, 768)
+    assert all(
+        finding.screenshot_ref == narrow_scenario.screenshot_ref
+        for finding in narrow_scenario.findings
+    )
+
+    table_result = run_with_screenshots(
+        "text-reflow-table",
+        width=1365,
+        height=768,
+        viewport_name="tablet",
+    )
+    height_scenario = next(
+        item for item in table_result.scenarios
+        if item.scenario_id == "reflow_256_css_px_height"
+    )
+    if height_scenario.status == "completed" and height_scenario.findings:
+        assert height_scenario.screenshot_ref is not None
+        height_image = (tmp_path / height_scenario.screenshot_ref).read_bytes()
+        assert struct.unpack(">II", height_image[16:24]) == (1365, 256)
+        assert all(
+            finding.screenshot_ref == height_scenario.screenshot_ref
+            for finding in height_scenario.findings
+        )
+    else:
+        assert height_scenario.screenshot_ref is None
+
+
+def test_screenshot_failure_preserves_measurements_and_restores_page(
+    fixture_server,
+):
+    async def fail_screenshot(*_args, **_kwargs):
+        raise OSError("storage unavailable")
+
+    async def run():
+        async with async_playwright() as playwright:
+            browser = await playwright.chromium.launch()
+            try:
+                page = await browser.new_page(viewport={"width": 1365, "height": 768})
+                await page.goto(
+                    f"{fixture_server}/text-reflow-clipped",
+                    wait_until="domcontentloaded",
+                )
+                original_styles = await page.locator("#clipped").evaluate(
+                    """element => ({
+                        value: element.style.getPropertyValue("font-size"),
+                        priority: element.style.getPropertyPriority("font-size")
+                    })"""
+                )
+                result = await audit_text_reflow(
+                    page,
+                    baseline_width=1365,
+                    baseline_height=768,
+                    viewport_name="desktop",
+                    capture_screenshot=fail_screenshot,
+                )
+                restored_styles = await page.locator("#clipped").evaluate(
+                    """element => ({
+                        value: element.style.getPropertyValue("font-size"),
+                        priority: element.style.getPropertyPriority("font-size")
+                    })"""
+                )
+                await page.goto(
+                    f"{fixture_server}/text-reflow-wide",
+                    wait_until="domcontentloaded",
+                )
+                narrow_result = await audit_text_reflow(
+                    page,
+                    baseline_width=1365,
+                    baseline_height=768,
+                    viewport_name="desktop",
+                    capture_screenshot=fail_screenshot,
+                )
+                return (
+                    result,
+                    narrow_result,
+                    page.viewport_size,
+                    original_styles,
+                    restored_styles,
+                )
+            finally:
+                await browser.close()
+
+    (
+        result,
+        narrow_result,
+        viewport_size,
+        original_styles,
+        restored_styles,
+    ) = asyncio.run(run())
+    scenario = next(
+        item for item in result.scenarios if item.scenario_id == "text_200_percent"
+    )
+    narrow_scenario = next(
+        item for item in narrow_result.scenarios
+        if item.scenario_id == "reflow_320_css_px"
+    )
+
+    assert scenario.status == "completed"
+    assert scenario.measurement is not None
+    assert scenario.findings
+    assert scenario.screenshot_ref is None
+    assert any("screenshot capture failed (OSError)" in item for item in scenario.details)
+    assert narrow_scenario.status == "completed"
+    assert narrow_scenario.measurement is not None
+    assert narrow_scenario.findings
+    assert narrow_scenario.screenshot_ref is None
+    assert any(
+        "screenshot capture failed (OSError)" in item
+        for item in narrow_scenario.details
+    )
+    assert viewport_size == {"width": 1365, "height": 768}
+    assert restored_styles == original_styles
+
+
 def test_text_reflow_disclosure_remains_operable_when_clipping_is_reported(
     fixture_server,
 ):
@@ -850,7 +1102,9 @@ def test_text_reflow_baseline_failure_is_explicit():
     assert result.scenarios[0].classification == "error"
 
 
-def test_text_reflow_restores_styles_and_viewport_after_scenarios(fixture_server):
+def test_text_reflow_restores_styles_and_viewport_after_scenarios(
+    fixture_server, tmp_path
+):
     async def run():
         async with async_playwright() as playwright:
             browser = await playwright.chromium.launch()
@@ -876,7 +1130,13 @@ def test_text_reflow_restores_styles_and_viewport_after_scenarios(fixture_server
                     })"""
                 )
                 result = await audit_text_reflow(
-                    page, baseline_width=1365, baseline_height=768
+                    page,
+                    baseline_width=1365,
+                    baseline_height=768,
+                    viewport_name="desktop",
+                    capture_screenshot=_scenario_screenshot_capture(
+                        LocalScreenshotStorage(tmp_path)
+                    ),
                 )
                 restored_style = await page.locator("td").first.evaluate(
                     """(element) => ({
@@ -919,6 +1179,11 @@ def test_text_reflow_restores_styles_and_viewport_after_scenarios(fixture_server
     assert height_scenario.status == "completed"
     assert height_scenario.viewport_width == 1365
     assert height_scenario.measurement.viewport_height == 256
+    assert any(
+        scenario.screenshot_ref
+        for scenario in result.scenarios
+        if scenario.findings
+    )
 
 
 def test_text_reflow_candidate_limit_prevents_clean_classification(

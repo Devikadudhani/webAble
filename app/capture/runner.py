@@ -1,5 +1,6 @@
 import logging
 import re
+import struct
 import time
 from collections.abc import Awaitable, Callable
 from datetime import datetime, timezone
@@ -54,6 +55,40 @@ class BrowserCapture:
         self._url_validator = url_validator
         self._navigation_timeout_ms = navigation_timeout_ms
         self._settling_period_ms = settling_period_ms
+
+    async def save_scenario_screenshot(
+        self,
+        page: Page,
+        capture_id: str,
+        viewport_name: str,
+        scenario_id: str,
+        width: int,
+        height: int,
+    ) -> str:
+        dimensions = await page.evaluate(
+            "() => ({width: window.innerWidth, height: window.innerHeight})"
+        )
+        if dimensions != {"width": width, "height": height}:
+            raise RuntimeError("Scenario viewport changed before screenshot capture.")
+
+        image = await page.screenshot(
+            type="png",
+            full_page=False,
+            scale="css",
+        )
+        if image[:8] != b"\x89PNG\r\n\x1a\n" or len(image) < 24:
+            raise RuntimeError("Scenario screenshot is not a valid PNG image.")
+        image_width, image_height = struct.unpack(">II", image[16:24])
+        if (image_width, image_height) != (width, height):
+            raise RuntimeError("Scenario screenshot dimensions do not match its viewport.")
+        return self._storage.save_scenario(
+            image,
+            capture_id=capture_id,
+            viewport_name=viewport_name,
+            scenario_id=scenario_id,
+            width=width,
+            height=height,
+        )
 
     async def capture(
         self,

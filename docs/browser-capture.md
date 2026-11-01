@@ -134,13 +134,14 @@ Each successful viewport also includes `text_reflow_audit` with separately
 identified baseline, 200% text-enlargement, 320 CSS-pixel reflow, and browser
 zoom scenarios. The text scenario temporarily doubles each discovered visible
 text-bearing element's computed font size, measures clipping and new text
-overlaps, and restores inline font styles within the same page evaluation.
-All eligible candidates' original computed sizes are read before any style is
-changed. Nested and inherited sizes are then set as explicit doubled pixel
-values, so this deterministic method does not reproduce relative-unit
-cascading or every browser's text-only zoom behavior. The 320 CSS-pixel
-scenario resizes the existing page using CSS viewport dimensions and restores
-the original viewport in a `finally` path. A 256 CSS-pixel height probe at the
+overlaps, optionally captures the suspicious state, and restores inline font
+styles in a cleanup evaluation. All eligible candidates' original computed
+sizes are read before any style is changed. Nested and inherited sizes are
+then set as explicit doubled pixel values, so this deterministic method does
+not reproduce relative-unit cascading or every browser's text-only zoom
+behavior. The 320 CSS-pixel scenario resizes the existing page using CSS
+viewport dimensions, measures and optionally captures before restoring the
+original viewport in a `finally` path. A 256 CSS-pixel height probe at the
 captured width runs only when a table or ARIA table/grid is detected.
 
 Playwright Chromium in this configuration does not provide a reliable
@@ -160,13 +161,43 @@ The bounded scan does not inspect generated pseudo-element content, canvas
 text, or text embedded in images; it does not evaluate every dynamic or
 interactive state, and it samples at most 300 text-bearing elements. A
 responsive replacement or missing baseline element is reported for review,
-not treated as proof of lost content. Only the original capture screenshot is
-referenced; scenario screenshots are not saved because the text override is
-applied and restored inside one synchronous page evaluation, while the
-existing capture callback has no scenario-screenshot storage hook. Splitting
-that operation to screenshot a modified page would require a separate
-cleanup-safe lifecycle. `no_violation_detected` means only that these bounded
-checks did not detect a problem; it is not a conformance claim.
+not treated as proof of lost content. Desktop, tablet, and mobile baseline
+screenshots retain their existing capture behavior. A separate scenario
+screenshot is captured only when the 200% text, 320 CSS-pixel reflow, or
+executed 256 CSS-pixel-height measurement produces findings. Each qualifying
+scenario gets at most one viewport-sized PNG, shared by its scenario and all
+its findings; no image is generated for a clean or untested scenario.
+
+The 200% text override remains applied through measurement and optional
+screenshot capture, then is restored in a `finally` path. Scenario
+measurements wait for two animation frames after applying the font override or
+resizing the viewport; screenshots are taken immediately after those
+measurements and before the override or viewport is restored. Capture verifies
+the live CSS viewport and uses CSS-pixel image scaling rather than a full-page
+image. Scenario files include a unique capture identifier plus the viewport
+and scenario identifiers, so they do not overwrite the baseline screenshot or
+another capture. Screenshot errors are reported in scenario details and do
+not erase measurements or findings.
+Screenshots are supporting visual evidence only: disabling capture or a
+failed image save does not disable detection. `no_violation_detected` means
+only that these bounded checks did not detect a problem; it is not a
+conformance claim.
+
+For a three-viewport scan, the two always-run probes can add at most six
+scenario screenshots (one text-enlargement and one 320px image per viewport).
+The conditional 256px-height probe can add at most three more, only where it
+was actually run and produced findings. Pages without suspicious findings
+add none. The 18 existing local PNGs measured for this change averaged 187,456
+bytes (~183 KiB); at that observed average, six additional images are about
+1.12 MB and the nine-image upper bound is about 1.69 MB. These are estimates,
+not a guaranteed image size. Each screenshot adds one viewport-sized PNG
+capture and storage write. Each measured scenario also waits for two animation
+frames after applying its override or viewport change, whether or not a
+screenshot is ultimately needed: nominally about 33 ms per scenario at 60 Hz,
+or about 200 ms for the six unconditional probes and 300 ms if all three
+conditional height probes also run. These are frame-rate estimates, not
+measured wall-clock guarantees. No extra browser navigation or full-page
+rendering is performed.
 
 The checked-in text-reflow fixtures have these observed behaviors and test
 expectations:

@@ -228,6 +228,7 @@ class TextReflowFindingSchema(BaseModel):
     baseline_evidence: dict | None
     confidence: Literal["high", "medium", "low"]
     remediation: str
+    screenshot_ref: str | None
 
 
 class TextReflowScenarioSchema(BaseModel):
@@ -554,6 +555,9 @@ async def create_capture(request: CaptureRequest) -> ResponsiveCaptureResponse:
                     request.url,
                     capture_service.capture,
                     destination_validator=url_validator,
+                    scenario_screenshot_capture=(
+                        capture_service.save_scenario_screenshot
+                    ),
                 )
 
         results = await asyncio.wait_for(

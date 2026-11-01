@@ -1,6 +1,7 @@
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field, replace
 from typing import Literal, Protocol
+from uuid import uuid4
 
 from app.analyzers.accessibility import (
     AccessibilityScanResult,
@@ -26,6 +27,7 @@ from app.analyzers.keyboard_focus import (
     audit_keyboard_focus,
 )
 from app.analyzers.text_reflow import (
+    ScenarioScreenshotCapture,
     TextReflowAuditResult,
     audit_text_reflow,
 )
@@ -130,10 +132,12 @@ async def capture_responsive_viewports(
     capture: CaptureFunction,
     diagnoser: ElementDiagnoser = diagnose_element_horizontal_overflow,
     destination_validator: DestinationValidator | None = None,
+    scenario_screenshot_capture: ScenarioScreenshotCapture | None = None,
 ) -> list[ViewportCaptureResult]:
     """Capture one URL at the standard viewports and analyze complete measurements."""
     results: list[ViewportCaptureResult] = []
     stop_after_unsafe_url = False
+    capture_id = uuid4().hex
 
     for name, viewport in VIEWPORTS:
         if stop_after_unsafe_url:
@@ -245,6 +249,9 @@ async def capture_responsive_viewports(
                     page,
                     baseline_width=viewport.width,
                     baseline_height=viewport.height,
+                    viewport_name=name,
+                    capture_id=capture_id,
+                    capture_screenshot=scenario_screenshot_capture,
                 )
             except Exception as error:
                 text_reflow = TextReflowAuditResult(

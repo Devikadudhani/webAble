@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass, field
-from typing import Literal, Protocol
+from dataclasses import dataclass, field, replace
+from typing import Any, Awaitable, Callable, Literal, Protocol
+from uuid import uuid4
 
 ScenarioStatus = Literal["completed", "unsupported", "not_tested", "error"]
 ScenarioClassification = Literal[
@@ -47,6 +48,7 @@ class TextReflowFinding:
     baseline_evidence: dict | None
     confidence: Literal["high", "medium", "low"]
     remediation: str
+    screenshot_ref: str | None = None
 
 
 @dataclass(frozen=True)
@@ -74,14 +76,19 @@ class TextReflowAuditResult:
 
 
 class TextReflowPage(Protocol):
-    async def evaluate(self, expression: str, argument: dict) -> dict:
+    async def evaluate(self, expression: str, argument: dict) -> Any:
         ...
 
     async def set_viewport_size(self, viewport_size: dict[str, int]) -> None:
         ...
 
 
-_MEASURE_PAGE = """(options) => {
+ScenarioScreenshotCapture = Callable[
+    [TextReflowPage, str, str, str, int, int], Awaitable[str]
+]
+
+
+_MEASURE_PAGE = """async (options) => {
     const maxElements = options.maxElements;
     const selectorFor = (element) => {
       if (element.id) {
@@ -139,6 +146,7 @@ _MEASURE_PAGE = """(options) => {
     const all = [...document.querySelectorAll("*")];
     const textCandidates = all.filter(element => visible(element) && textBearing(element));
     const originalInlineStyles = [];
+    let retainInlineStyles = false;
     try {
       if (options.enlargeText) {
         for (const element of textCandidates.slice(0, maxElements)) {
@@ -159,6 +167,18 @@ _MEASURE_PAGE = """(options) => {
             "important"
           );
         }
+        if (options.holdFontStyles && originalInlineStyles.length) {
+          window[options.restoreKey] = originalInlineStyles;
+          retainInlineStyles = true;
+        }
+      }
+
+      if (options.stabilizeLayout) {
+        await new Promise(resolve =>
+          requestAnimationFrame(() =>
+            requestAnimationFrame(resolve)
+          )
+        );
       }
 
       const textElements = textCandidates.slice(0, maxElements);
@@ -266,14 +286,37 @@ _MEASURE_PAGE = """(options) => {
         overflowBoundaries: overflowBoundaries.slice(0, 20)
       };
     } finally {
-      for (const original of originalInlineStyles) {
-        if (original.value) {
-          original.element.style.setProperty("font-size", original.value, original.priority);
-        } else {
-          original.element.style.removeProperty("font-size");
+      if (!retainInlineStyles) {
+        for (const original of originalInlineStyles) {
+          if (original.value) {
+            original.element.style.setProperty("font-size", original.value, original.priority);
+          } else {
+            original.element.style.removeProperty("font-size");
+          }
         }
       }
     }
+}"""
+
+_RESTORE_FONT_STYLES = """(options) => {
+  const originals = window[options.restoreKey];
+  if (!Array.isArray(originals)) return false;
+  try {
+    for (const original of originals) {
+      if (original.value) {
+        original.element.style.setProperty(
+          "font-size",
+          original.value,
+          original.priority
+        );
+      } else {
+        original.element.style.removeProperty("font-size");
+      }
+    }
+    return true;
+  } finally {
+    delete window[options.restoreKey];
+  }
 }"""
 
 
@@ -337,15 +380,17 @@ def _analyze(
                     },
                     baseline_evidence=(
                         {
-                            key: prior.get(key)
-                            for key in (
-                                "fontSize",
-                                "clientHeight",
-                                "scrollHeight",
-                                "overflowY",
-                            )
+                            **{
+                                key: prior.get(key)
+                                for key in (
+                                    "fontSize",
+                                    "clientHeight",
+                                    "scrollHeight",
+                                    "overflowY",
+                                )
+                            },
+                            "content_signature": prior.get("contentSignature"),
                         }
-                        | {"content_signature": prior.get("contentSignature")}
                         if prior
                         else None
                     ),
@@ -450,6 +495,7 @@ def _analyze(
                         "within the viewport."
                     ),
                 )
+            )
     for element in raw.get("elements", []):
         selector = str(element.get("selector", ""))
         prior = baseline_elements.get(selector)
@@ -486,7 +532,6 @@ def _analyze(
                         "available after the tested viewport or enlargement change."
                     ),
                 )
-            )
             )
     if baseline and not baseline.get("candidatesTruncated") and not raw.get(
         "candidatesTruncated"
@@ -617,25 +662,76 @@ def _analyze(
     return "no_violation_detected", []
 
 
+async def _capture_scenario_evidence(
+    page: TextReflowPage,
+    scenario: TextReflowScenario,
+    *,
+    viewport_name: str,
+    capture_id: str,
+    capture_screenshot: ScenarioScreenshotCapture | None,
+) -> TextReflowScenario:
+    if not scenario.findings:
+        return scenario
+    if capture_screenshot is None:
+        return replace(
+            scenario,
+            details=[
+                *scenario.details,
+                "A scenario screenshot was not captured because screenshot storage is unavailable; measurements and findings are retained.",
+            ],
+        )
+    try:
+        screenshot_ref = await capture_screenshot(
+            page,
+            capture_id,
+            viewport_name,
+            scenario.scenario_id,
+            scenario.viewport_width or 0,
+            scenario.viewport_height or 0,
+        )
+    except Exception as error:
+        return replace(
+            scenario,
+            details=[
+                *scenario.details,
+                f"Scenario screenshot capture failed ({type(error).__name__}); measurements and findings are retained.",
+            ],
+        )
+    return replace(
+        scenario,
+        screenshot_ref=screenshot_ref,
+        findings=[
+            replace(finding, screenshot_ref=screenshot_ref)
+            for finding in scenario.findings
+        ],
+    )
+
+
 async def audit_text_reflow(
     page: TextReflowPage,
     *,
     baseline_width: int,
     baseline_height: int,
     screenshot_ref: str | None = None,
+    viewport_name: str = "viewport",
+    capture_id: str | None = None,
+    capture_screenshot: ScenarioScreenshotCapture | None = None,
 ) -> TextReflowAuditResult:
     """Measure text enlargement and reflow without replacing the live capture page."""
     scenarios: list[TextReflowScenario] = []
+    capture_id = capture_id or uuid4().hex
     details = [
         "Text enlargement captures each eligible candidate's computed font size before changes and applies twice that pixel value per element. Nested and inherited styles therefore become explicit overrides; this is not equivalent to every browser's text-only zoom behavior.",
         "No scenario result establishes WCAG conformance. Clipping, ellipsis, overlap, and overflow are observations requiring review because this analyzer cannot determine whether information remains available or whether an exception applies. Opaque content signatures flag text changes without returning the text itself.",
-        "Scenario screenshots are not saved: the text override is applied and restored inside one synchronous page evaluation, and the capture callback has no scenario-screenshot storage hook. Separating the state change, screenshot, and restoration would require a distinct cleanup-safe capture flow.",
     ]
     try:
         baseline = await asyncio.wait_for(
             page.evaluate(
                 _MEASURE_PAGE,
-                {"maxElements": MAX_INSPECTED_ELEMENTS, "enlargeText": False},
+                {
+                    "maxElements": MAX_INSPECTED_ELEMENTS,
+                    "enlargeText": False,
+                },
             ),
             timeout=SCENARIO_TIMEOUT_SECONDS,
         )
@@ -674,30 +770,23 @@ async def audit_text_reflow(
         )
     )
 
+    restore_key = f"__webAbleTextReflow_{uuid4().hex}"
+    text_scenario: TextReflowScenario | None = None
+    measurement_completed = False
     try:
         enlarged = await asyncio.wait_for(
             page.evaluate(
                 _MEASURE_PAGE,
-                {"maxElements": MAX_INSPECTED_ELEMENTS, "enlargeText": True},
+                {
+                    "maxElements": MAX_INSPECTED_ELEMENTS,
+                    "enlargeText": True,
+                    "holdFontStyles": True,
+                    "restoreKey": restore_key,
+                    "stabilizeLayout": True,
+                },
             ),
             timeout=SCENARIO_TIMEOUT_SECONDS,
         )
-    except Exception as error:
-        scenarios.append(
-            TextReflowScenario(
-                scenario_id="text_200_percent",
-                status="error",
-                classification="error",
-                condition="Increase each discovered visible text-bearing element's computed font size to 200%.",
-                method="Temporarily set per-element computed font sizes to twice their original size inside one synchronous page evaluation, then restore inline styles.",
-                criterion_ids=["1.4.4"],
-                viewport_width=baseline_width,
-                viewport_height=baseline_height,
-                baseline_measurement=_measurement(baseline),
-                details=[f"Text enlargement scenario failed ({type(error).__name__})."],
-            )
-        )
-    else:
         classification, findings = _analyze(
             "text_200_percent", enlarged, baseline, "1.4.4"
         )
@@ -712,22 +801,73 @@ async def audit_text_reflow(
             scenario_details.append(
                 f"Text-element inspection was capped at {MAX_INSPECTED_ELEMENTS} candidates."
             )
-        scenarios.append(
-            TextReflowScenario(
-                scenario_id="text_200_percent",
-                status="completed",
-                classification=classification,
-                condition="Increase text to 200% without changing the CSS viewport or scaling the whole page.",
-                method="Temporarily set each discovered visible text-bearing element's computed font size to twice its baseline value; restore styles in the same page evaluation.",
-                criterion_ids=["1.4.4"],
-                viewport_width=baseline_width,
-                viewport_height=baseline_height,
-                measurement=_measurement(enlarged),
-                baseline_measurement=_measurement(baseline),
-                findings=findings,
-                details=scenario_details,
-            )
+        text_scenario = TextReflowScenario(
+            scenario_id="text_200_percent",
+            status="completed",
+            classification=classification,
+            condition="Increase text to 200% without changing the CSS viewport or scaling the whole page.",
+            method="Temporarily set each discovered visible text-bearing element's computed font size to twice its baseline value, measure, capture any suspicious state, then restore styles.",
+            criterion_ids=["1.4.4"],
+            viewport_width=baseline_width,
+            viewport_height=baseline_height,
+            measurement=_measurement(enlarged),
+            baseline_measurement=_measurement(baseline),
+            findings=findings,
+            details=scenario_details,
         )
+        measurement_completed = True
+        text_scenario = await _capture_scenario_evidence(
+            page,
+            text_scenario,
+            viewport_name=viewport_name,
+            capture_id=capture_id,
+            capture_screenshot=capture_screenshot,
+        )
+    except Exception as error:
+        text_scenario = TextReflowScenario(
+            scenario_id="text_200_percent",
+            status="error",
+            classification="error",
+            condition="Increase each discovered visible text-bearing element's computed font size to 200%.",
+            method="Temporarily set per-element computed font sizes to twice their original size, measure the page, then restore inline styles.",
+            criterion_ids=["1.4.4"],
+            viewport_width=baseline_width,
+            viewport_height=baseline_height,
+            baseline_measurement=_measurement(baseline),
+            details=[f"Text enlargement scenario failed ({type(error).__name__})."],
+        )
+    finally:
+        try:
+            styles_restored = await asyncio.wait_for(
+                page.evaluate(
+                    _RESTORE_FONT_STYLES,
+                    {"restoreKey": restore_key},
+                ),
+                timeout=SCENARIO_TIMEOUT_SECONDS,
+            )
+            if (
+                measurement_completed
+                and not styles_restored
+                and text_scenario is not None
+            ):
+                text_scenario = replace(
+                    text_scenario,
+                    details=[
+                        *text_scenario.details,
+                        "The temporary font-size overrides were not present when restoration ran.",
+                    ],
+                )
+        except Exception as error:
+            if text_scenario is not None:
+                text_scenario = replace(
+                    text_scenario,
+                    details=[
+                        *text_scenario.details,
+                        f"Temporary font-size styles could not be restored ({type(error).__name__}).",
+                    ],
+                )
+    assert text_scenario is not None
+    scenarios.append(text_scenario)
 
     if not callable(getattr(page, "set_viewport_size", None)):
         scenarios.append(
@@ -747,6 +887,7 @@ async def audit_text_reflow(
     else:
         viewport_error: str | None = None
         narrow: dict | None = None
+        narrow_scenario: TextReflowScenario | None = None
         try:
             await asyncio.wait_for(
                 page.set_viewport_size({"width": 320, "height": baseline_height}),
@@ -755,9 +896,48 @@ async def audit_text_reflow(
             narrow = await asyncio.wait_for(
                 page.evaluate(
                     _MEASURE_PAGE,
-                    {"maxElements": MAX_INSPECTED_ELEMENTS, "enlargeText": False},
+                    {
+                        "maxElements": MAX_INSPECTED_ELEMENTS,
+                        "enlargeText": False,
+                        "stabilizeLayout": True,
+                    },
                 ),
                 timeout=SCENARIO_TIMEOUT_SECONDS,
+            )
+            classification, findings = _analyze(
+                "reflow_320_css_px", narrow, baseline, "1.4.10"
+            )
+            scenario_details = [
+                "The 320 CSS-pixel condition checks vertical-scrolling content. Document or element overflow alone is not classified as a confirmed violation; two-dimensional content and scrolling exceptions require review."
+            ]
+            if narrow.get("candidatesTruncated"):
+                scenario_details.append(
+                    f"Text-element inspection was capped at {MAX_INSPECTED_ELEMENTS} candidates."
+                )
+            if baseline.get("candidatesTruncated"):
+                scenario_details.append(
+                    f"Baseline text-element discovery was capped at {MAX_INSPECTED_ELEMENTS} candidates."
+                )
+            narrow_scenario = TextReflowScenario(
+                scenario_id="reflow_320_css_px",
+                status="completed",
+                classification=classification,
+                condition="320 CSS-pixel viewport width at the captured viewport height.",
+                method="Resize the existing page viewport, measure CSS-pixel geometry, capture any suspicious state, then restore the original viewport.",
+                criterion_ids=["1.4.10"],
+                viewport_width=320,
+                viewport_height=baseline_height,
+                measurement=_measurement(narrow),
+                baseline_measurement=_measurement(baseline),
+                findings=findings,
+                details=scenario_details,
+            )
+            narrow_scenario = await _capture_scenario_evidence(
+                page,
+                narrow_scenario,
+                viewport_name=viewport_name,
+                capture_id=capture_id,
+                capture_screenshot=capture_screenshot,
             )
         except Exception as error:
             viewport_error = f"Narrow-viewport scenario failed ({type(error).__name__})."
@@ -790,36 +970,8 @@ async def audit_text_reflow(
                 )
             )
         else:
-            classification, findings = _analyze(
-                "reflow_320_css_px", narrow, baseline, "1.4.10"
-            )
-            scenario_details = [
-                "The 320 CSS-pixel condition checks vertical-scrolling content. Document or element overflow alone is not classified as a confirmed violation; two-dimensional content and scrolling exceptions require review."
-            ]
-            if narrow.get("candidatesTruncated"):
-                scenario_details.append(
-                    f"Text-element inspection was capped at {MAX_INSPECTED_ELEMENTS} candidates."
-                )
-            if baseline.get("candidatesTruncated"):
-                scenario_details.append(
-                    f"Baseline text-element discovery was capped at {MAX_INSPECTED_ELEMENTS} candidates."
-                )
-            scenarios.append(
-                TextReflowScenario(
-                    scenario_id="reflow_320_css_px",
-                    status="completed",
-                    classification=classification,
-                    condition="320 CSS-pixel viewport width at the captured viewport height.",
-                    method="Resize the existing page viewport and measure CSS-pixel geometry, then restore the original viewport.",
-                    criterion_ids=["1.4.10"],
-                    viewport_width=320,
-                    viewport_height=baseline_height,
-                    measurement=_measurement(narrow),
-                    baseline_measurement=_measurement(baseline),
-                    findings=findings,
-                    details=scenario_details,
-                )
-            )
+            assert narrow_scenario is not None
+            scenarios.append(narrow_scenario)
 
             two_dimensional_content = any(
                 element.get("twoDimensionalRegion")
@@ -828,6 +980,7 @@ async def audit_text_reflow(
             if two_dimensional_content:
                 short_height: dict | None = None
                 short_height_error: str | None = None
+                short_height_scenario: TextReflowScenario | None = None
                 try:
                     await asyncio.wait_for(
                         page.set_viewport_size({"width": baseline_width, "height": 256}),
@@ -836,9 +989,42 @@ async def audit_text_reflow(
                     short_height = await asyncio.wait_for(
                         page.evaluate(
                             _MEASURE_PAGE,
-                            {"maxElements": MAX_INSPECTED_ELEMENTS, "enlargeText": False},
+                            {
+                                "maxElements": MAX_INSPECTED_ELEMENTS,
+                                "enlargeText": False,
+                                "stabilizeLayout": True,
+                            },
                         ),
                         timeout=SCENARIO_TIMEOUT_SECONDS,
+                    )
+                    classification, findings = _analyze(
+                        "reflow_256_css_px_height",
+                        short_height,
+                        baseline,
+                        "1.4.10",
+                    )
+                    short_height_scenario = TextReflowScenario(
+                        scenario_id="reflow_256_css_px_height",
+                        status="completed",
+                        classification=classification,
+                        condition="256 CSS-pixel viewport height at the captured CSS width for detected two-dimensional content.",
+                        method="Temporarily resize the existing page viewport height, measure text geometry, capture any suspicious state, then restore the original dimensions.",
+                        criterion_ids=["1.4.10"],
+                        viewport_width=baseline_width,
+                        viewport_height=256,
+                        baseline_measurement=_measurement(baseline),
+                        measurement=_measurement(short_height),
+                        findings=findings,
+                        details=[
+                            "Detection of two-dimensional content is heuristic. The 256-pixel height condition does not decide whether a specific table, diagram, or other region qualifies for the WCAG exception."
+                        ],
+                    )
+                    short_height_scenario = await _capture_scenario_evidence(
+                        page,
+                        short_height_scenario,
+                        viewport_name=viewport_name,
+                        capture_id=capture_id,
+                        capture_screenshot=capture_screenshot,
                     )
                 except Exception as error:
                     short_height_error = (
@@ -873,30 +1059,8 @@ async def audit_text_reflow(
                         )
                     )
                 else:
-                    classification, findings = _analyze(
-                        "reflow_256_css_px_height",
-                        short_height,
-                        baseline,
-                        "1.4.10",
-                    )
-                    scenarios.append(
-                        TextReflowScenario(
-                            scenario_id="reflow_256_css_px_height",
-                            status="completed",
-                            classification=classification,
-                            condition="256 CSS-pixel viewport height at the captured CSS width for detected two-dimensional content.",
-                            method="Temporarily resize the existing page viewport height and measure text-bearing elements and overflow boundaries, then restore the original dimensions.",
-                            criterion_ids=["1.4.10"],
-                            viewport_width=baseline_width,
-                            viewport_height=256,
-                            baseline_measurement=_measurement(baseline),
-                            measurement=_measurement(short_height),
-                            findings=findings,
-                            details=[
-                                "Detection of two-dimensional content is heuristic. The 256-pixel height condition does not decide whether a specific table, diagram, or other region qualifies for the WCAG exception."
-                            ],
-                        )
-                    )
+                    assert short_height_scenario is not None
+                    scenarios.append(short_height_scenario)
             else:
                 scenarios.append(
                     TextReflowScenario(
