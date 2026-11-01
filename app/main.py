@@ -58,6 +58,7 @@ from app.analyzers.hybrid_evaluation import (
     OwnerAnswer,
     WCAG_CRITERION_IDS,
     build_hybrid_evaluation,
+    question_answer_interpretation,
     sanitize_context_url,
     validate_owner_text,
     validate_questionnaire_inputs,
@@ -1057,6 +1058,9 @@ async def get_accessibility_questionnaire() -> dict:
                 "feature_id": question.feature_id,
                 "prompt": question.prompt,
                 "answer_options": list(question.answer_options),
+                "answer_interpretation": question_answer_interpretation(
+                    question.question_id
+                ),
                 "helper_text": question.helper_text,
             }
             for question in INITIAL_QUESTIONS
@@ -1068,6 +1072,9 @@ async def get_accessibility_questionnaire() -> dict:
                 "feature_id": question.feature_id,
                 "prompt": question.prompt,
                 "answer_options": list(question.answer_options),
+                "answer_interpretation": question_answer_interpretation(
+                    question.question_id
+                ),
                 "helper_text": question.helper_text,
             }
             for question in QUESTIONNAIRE_QUESTIONS

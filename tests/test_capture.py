@@ -352,6 +352,11 @@ def test_capture_endpoint_returns_200_for_local_fixture(
     assert form_criterion["status"] == "owner_reported"
     assert form_criterion["manual_review_required"] is True
     assert form_criterion["owner_reported"][0]["question_id"] == "forms.error_identification"
+    assert form_criterion["owner_self_assessment"]["status"] == "assessed_from_owner_answers"
+    assert form_criterion["owner_self_assessment"]["responses"][0]["answer"] == "not_sure"
+    assert form_criterion["owner_self_assessment"]["reported_outcome"] == "inconclusive"
+    assert form_criterion["owner_self_assessment"]["responses"][0]["independent_review"] is False
+    assert form_criterion["owner_self_assessment"]["criterion_conclusion"] is None
     assert hybrid_evaluation["representative_page_urls"] == [
         f"{fixture_server}/normal"
     ]

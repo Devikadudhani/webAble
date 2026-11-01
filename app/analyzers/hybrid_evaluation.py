@@ -247,7 +247,7 @@ QUESTIONNAIRE_QUESTIONS = (
         "authentication.cognitive_steps",
         ("3.3.8",),
         "authentication",
-        "Which sign-in methods are available, and do any require users to remember, transcribe, or recognize information? Describe alternatives without sharing credentials.",
+        "Can users complete each authentication step without a cognitive function test (such as memorizing or transcribing a code), or use a permitted accessible alternative? Do not share credentials.",
     ),
     QuestionnaireQuestion(
         "timing.adjustment",
@@ -277,7 +277,7 @@ QUESTIONNAIRE_QUESTIONS = (
         "widgets.status_messages",
         ("4.1.3",),
         "custom_widgets",
-        "Which updates (such as saved, submitted, loading, result, or error messages) appear without moving focus? How should assistive technology users be notified, and on which pages?",
+        "Are status messages (such as saved, submitted, loading, result, or error updates) programmatically exposed to assistive technology without requiring focus to move? Identify relevant pages and examples.",
     ),
     QuestionnaireQuestion(
         "widgets.accessible_name_role_state",
@@ -367,7 +367,7 @@ QUESTIONNAIRE_QUESTIONS = (
         "keyboard.character_shortcuts",
         ("2.1.4",),
         "custom_widgets",
-        "Does the site use single-letter keyboard shortcuts? If so, can users turn them off, remap them, or use them only when the relevant component has focus?",
+        "If the site has single-character keyboard shortcuts, can users turn them off, remap them to include a non-printable key, or limit them to the relevant component while it has focus?",
     ),
     QuestionnaireQuestion(
         "content.headings_and_labels",
@@ -403,7 +403,7 @@ QUESTIONNAIRE_QUESTIONS = (
         "pointer.gesture_alternative",
         ("2.5.1",),
         "pointer_gestures",
-        "Which tasks require multipoint or path-based pointer gestures (such as pinch or drawn paths)? What single-pointer alternative performs the same task, and where can it be used?",
+        "Can every task that uses a multipoint or path-based pointer gesture (such as pinch or a drawn path) also be completed with a single pointer? Identify any task without an alternative.",
     ),
     QuestionnaireQuestion(
         "pointer.cancellation",
@@ -421,7 +421,7 @@ QUESTIONNAIRE_QUESTIONS = (
         "motion.actuation_alternative",
         ("2.5.4",),
         "motion_controls",
-        "Which features respond to device motion or gestures, and what on-screen alternative and disable option are available?",
+        "For each feature activated by device motion or user movement, can users perform the same action with an on-screen control and disable motion activation? Identify any exceptions.",
     ),
     QuestionnaireQuestion(
         "transactions.error_prevention",
@@ -469,7 +469,7 @@ QUESTIONNAIRE_QUESTIONS = (
         "visual.images_of_text",
         ("1.1.1", "1.4.5"),
         "text_in_images",
-        "Which images or graphics contain meaningful text, and are any logos, essential presentations, or customizable?",
+        "Is text presented as real text rather than images of text, except for logos, essential presentations, or customizable presentations? Identify any images of text and exceptions.",
     ),
     QuestionnaireQuestion(
         "layout.two_dimensional_content",
@@ -716,6 +716,110 @@ def validate_owner_text(value: str | None) -> str | None:
     return value
 
 
+_OWNER_ASSESSMENT_YES_MEANING_BY_QUESTION: dict[
+    str, Literal["support", "concern"]
+] = {
+    "media.prerecorded_alternatives": "support",
+    "media.prerecorded_audio_description_or_alternative": "support",
+    "media.live_captions": "support",
+    "media.prerecorded_audio_description": "support",
+    "forms.labels_and_instructions": "support",
+    "forms.error_identification": "support",
+    "forms.error_suggestions": "support",
+    "forms.repeated_entry": "concern",
+    "authentication.cognitive_steps": "support",
+    "motion.flash_threshold": "concern",
+    "widgets.status_messages": "support",
+    "content.meaningful_sequence": "support",
+    "visual.images_of_text": "support",
+    "forms.sensory_instructions": "support",
+    "widgets.sensory_instructions": "support",
+    "keyboard.character_shortcuts": "support",
+    "content.headings_and_labels": "support",
+    "widgets.no_unexpected_change_on_focus": "support",
+    "forms.no_unexpected_change_on_input": "support",
+    "pointer.gesture_alternative": "support",
+    "pointer.cancellation": "support",
+    "dragging.alternative": "support",
+    "motion.actuation_alternative": "support",
+    "transactions.error_prevention": "support",
+    "pages.multiple_ways_to_find": "support",
+    "pages.consistent_navigation_order": "support",
+    "pages.consistent_identification": "support",
+    "pages.consistent_help_location": "support",
+}
+
+
+_OWNER_ASSESSMENT_YES_MEANING = {
+    (question.question_id, criterion_id): yes_meaning
+    for question in QUESTIONNAIRE_QUESTIONS
+    if (yes_meaning := _OWNER_ASSESSMENT_YES_MEANING_BY_QUESTION.get(
+        question.question_id
+    ))
+    for criterion_id in question.criterion_ids
+    if not (
+        question.question_id == "visual.images_of_text"
+        and criterion_id == "1.1.1"
+    )
+}
+
+
+def _interpret_owner_answer(
+    answer: OwnerAnswer, criterion_id: str
+) -> dict[str, str]:
+    yes_meaning = _OWNER_ASSESSMENT_YES_MEANING.get(
+        (answer.question_id, criterion_id)
+    )
+    if answer.answer == "not_sure":
+        outcome = "inconclusive"
+    elif answer.answer == "not_applicable":
+        outcome = "not_applicable"
+    elif yes_meaning is None:
+        outcome = "context_only"
+    elif answer.answer == "yes":
+        outcome = (
+            "supports"
+            if yes_meaning == "support"
+            else "indicates_concern"
+        )
+    else:
+        outcome = (
+            "indicates_concern"
+            if yes_meaning == "support"
+            else "supports"
+        )
+    return {
+        "outcome": outcome,
+        "basis": (
+            "The questionnaire answer polarity is defined for this prompt; "
+            "this remains an unverified owner report."
+            if yes_meaning is not None
+            else "The answer is retained as context because the prompt has no reliable yes/no polarity."
+        ),
+    }
+
+
+def question_answer_interpretation(question_id: str) -> dict[str, str]:
+    question = _QUESTION_BY_ID[question_id]
+    return {
+        "by_criterion": {
+            criterion_id: {
+                "yes": _interpret_owner_answer(
+                    OwnerAnswer(question_id=question_id, answer="yes"),
+                    criterion_id,
+                )["outcome"],
+                "no": _interpret_owner_answer(
+                    OwnerAnswer(question_id=question_id, answer="no"),
+                    criterion_id,
+                )["outcome"],
+                "not_sure": "inconclusive",
+                "not_applicable": "not_applicable",
+            }
+            for criterion_id in question.criterion_ids
+        }
+    }
+
+
 def get_questions(
     declared_features: dict[str, bool | None],
     browser_features: tuple[BrowserFeatureEvidence, ...] = (),
@@ -845,6 +949,9 @@ def build_hybrid_evaluation(
     answers_by_criterion: dict[str, list[dict]] = {
         criterion_id: [] for criterion_id in WCAG_CRITERION_IDS
     }
+    self_assessment_by_criterion: dict[str, list[dict]] = {
+        criterion_id: [] for criterion_id in WCAG_CRITERION_IDS
+    }
     browser_by_criterion: dict[str, list[dict]] = {
         criterion_id: [] for criterion_id in WCAG_CRITERION_IDS
     }
@@ -862,6 +969,24 @@ def build_hybrid_evaluation(
         }
         for criterion_id in question.criterion_ids:
             answers_by_criterion[criterion_id].append(evidence)
+            self_assessment_by_criterion[criterion_id].append(
+                {
+                    "source": "owner_reported",
+                    "question_id": answer.question_id,
+                    "question": question.prompt,
+                    "answer": answer.answer,
+                    "reported_interpretation": _interpret_owner_answer(
+                        answer, criterion_id
+                    ),
+                    "explanation": answer.explanation,
+                    "page_urls": list(answer.page_urls),
+                    "independent_review": False,
+                    "interpretation": (
+                        "Owner self-assessment input only. The answer is recorded as reported; "
+                        "it is not independently verified and does not establish WCAG conformance."
+                    ),
+                }
+            )
 
     for feature_id, present in declared_features.items():
         if present is None:
@@ -923,6 +1048,39 @@ def build_hybrid_evaluation(
             status = "browser_observed"
         else:
             status = "not_evaluated"
+        assessment_responses = self_assessment_by_criterion[criterion_id]
+        assessment_outcomes = {
+            response["reported_interpretation"]["outcome"]
+            for response in assessment_responses
+        }
+        directional_outcomes = assessment_outcomes & {
+            "supports",
+            "indicates_concern",
+        }
+        if not assessment_responses:
+            reported_outcome = None
+            assessment_status = "not_provided"
+        elif len(directional_outcomes) > 1:
+            reported_outcome = "mixed"
+            assessment_status = "assessed_from_owner_answers"
+        elif directional_outcomes and assessment_outcomes & {
+            "inconclusive",
+            "not_applicable",
+        }:
+            reported_outcome = "mixed_or_inconclusive"
+            assessment_status = "assessed_from_owner_answers"
+        elif directional_outcomes:
+            reported_outcome = next(iter(directional_outcomes))
+            assessment_status = "assessed_from_owner_answers"
+        elif assessment_outcomes == {"not_applicable"}:
+            reported_outcome = "owner_marked_not_applicable"
+            assessment_status = "assessed_from_owner_answers"
+        elif assessment_outcomes == {"inconclusive"}:
+            reported_outcome = "inconclusive"
+            assessment_status = "assessed_from_owner_answers"
+        else:
+            reported_outcome = "context_only"
+            assessment_status = "context_only"
         criteria.append(
             {
                 "criterion_id": criterion_id,
@@ -930,6 +1088,18 @@ def build_hybrid_evaluation(
                 "status": status,
                 "manual_review_required": manual_review_needed,
                 "owner_reported": owner_evidence,
+                "owner_self_assessment": {
+                    "status": assessment_status,
+                    "reported_outcome": reported_outcome,
+                    "responses": assessment_responses,
+                    "criterion_conclusion": None,
+                    "interpretation": (
+                        "This is an owner-reported assessment, not an independent "
+                        "manual review or a WCAG pass/failure. Directional outcomes "
+                        "are inferred only for questions whose wording has a defined "
+                        "answer polarity; contextual answers are not interpreted."
+                    ),
+                },
                 "browser_observed": observed_evidence,
                 "conflicts": [],
                 "compliance_conclusion": None,
@@ -979,6 +1149,60 @@ def build_hybrid_evaluation(
         conflicts.append(conflict)
         for criterion_id in FEATURE_CRITERIA.get(feature_id, ()):
             criteria_by_id[criterion_id]["conflicts"].append(conflict)
+
+    browser_concern_statuses = {
+        "fail",
+        "violation",
+        "violations",
+        "confirmed_failure",
+    }
+    for criterion in criteria:
+        supporting_answers = [
+            answer
+            for answer in criterion["owner_self_assessment"]["responses"]
+            if answer["reported_interpretation"]["outcome"] == "supports"
+        ]
+        browser_concerns = [
+            evidence
+            for evidence in criterion["browser_observed"]
+            if evidence.get("result_status") in browser_concern_statuses
+        ]
+        if not supporting_answers or not browser_concerns:
+            continue
+        conflict = {
+            "type": "owner_support_browser_concern",
+            "criterion_id": criterion["criterion_id"],
+            "summary": (
+                "The owner reported support for this criterion, while a bounded "
+                "browser check reported a violation candidate. Review the same "
+                "page and state; neither source alone settles the criterion."
+            ),
+            "owner_answers": [
+                {
+                    "question_id": answer["question_id"],
+                    "answer": answer["answer"],
+                    "page_urls": answer["page_urls"],
+                }
+                for answer in supporting_answers
+            ],
+            "browser_evidence": [
+                {
+                    "analyzer_id": evidence.get("analyzer_id"),
+                    "result_status": evidence["result_status"],
+                    "viewport": evidence["viewport"],
+                    "summary": evidence["summary"],
+                    "evidence_count": evidence["evidence_count"],
+                }
+                for evidence in browser_concerns
+            ],
+            "resolution": (
+                "Review the affected page/state and reconcile the owner report with "
+                "the browser finding; this is a source disagreement, not a final "
+                "criterion conclusion."
+            ),
+        }
+        conflicts.append(conflict)
+        criterion["conflicts"].append(conflict)
 
     available_discoveries = [
         item for item in browser_discoveries if item.status == "available"

@@ -491,6 +491,19 @@ described journeys.
 
 The response includes `hybrid_evaluation.criteria`, a criterion-indexed collection
 with separate `owner_reported` and `browser_observed` evidence.
+Each criterion also includes `owner_self_assessment`: submitted criterion-specific
+answers are listed with their question, answer, explanation, page URLs, and
+reported interpretation. For direct prompts with defined polarity, the backend
+maps `yes`/`no` to `supports` or `indicates_concern`; reverse-worded questions
+such as re-entry and flashing use the opposite polarity. `not_sure` is
+`inconclusive`, `not_applicable` is `owner_marked_not_applicable`, and prompts
+without a reliable yes/no direction remain `context_only`. Multiple opposing
+or uncertain answers produce `mixed` or `mixed_or_inconclusive` rather than a
+forced result. This lets the audit report use owner answers for a scoped
+self-assessment without requiring a separate reviewer record. It does not
+independently verify the answer or establish WCAG conformance:
+`criterion_conclusion` and `compliance_conclusion` remain unset, and
+`manual_review_required` stays true.
 The initial adapter carries exact-tagged axe rule outcomes, keyboard/focus checks,
 text/reflow scenarios, non-text contrast and target-size probes, plus feature
 discovery observations. Each item retains its analyzer, viewport, and bounded
@@ -503,6 +516,13 @@ feature declarations are surfaced in `conflicts`; neither source silently
 overwrites the other. `compliance_conclusion` remains unset, owner answers carry
 `verified: false`, and criteria without evidence are `not_evaluated`, never
 implicitly passed.
+The evaluator also adds an `owner_support_browser_concern` conflict when a
+criterion-specific owner answer is interpreted as support and a browser check
+for that same criterion reports `fail`, `violation`, `violations`, or
+`confirmed_failure`. This prompts reconciliation of the relevant page/state;
+it does not resolve the disagreement. Browser `passes` and `incomplete` results
+do not cancel owner-reported concerns or create a reverse conflict, because a
+pass or incomplete outcome covers only the bounded rule/check performed.
 
 The capture response also exposes a top-level `scoring` summary. Its versioned
 registry is centralized in `app/analyzers/scoring.py`; each criterion includes
@@ -527,5 +547,8 @@ The capture API is currently stateless: questionnaire answers are scoped to the
 request/response and are not durably stored across audits. Deployments should add
 authenticated, access-controlled persistence and an explicit retention policy
 before retaining owner context. The questionnaire maps contextual questions to
-all criteria but is not a substitute for human, assistive-technology, and content
-review.
+all criteria, and direct questions have polarity mappings so responses can
+indicate owner-reported support, concern, or uncertainty for the criterion.
+This owner self-assessment does not independently verify conformance;
+assistive-technology, content, and interaction checks outside the questionnaire
+remain limitations of the self-report.

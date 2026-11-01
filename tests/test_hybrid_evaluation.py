@@ -147,6 +147,261 @@ def test_owner_only_and_empty_criteria_never_become_compliance_passes():
     assert criteria["1.2.1"]["compliance_conclusion"] is None
 
 
+def test_questionnaire_answers_create_criterion_scoped_owner_self_assessment():
+    from app.analyzers.hybrid_evaluation import (
+        QUESTIONNAIRE_QUESTIONS,
+        WCAG_CRITERIA_CATALOG,
+    )
+
+    manual_criteria = {
+        item["criterion_id"]
+        for item in WCAG_CRITERIA_CATALOG
+        if item["coverage_classification"] == "manual_evaluation_required"
+    }
+    questions_by_criterion = {
+        criterion_id: next(
+            question
+            for question in QUESTIONNAIRE_QUESTIONS
+            if criterion_id in question.criterion_ids
+        )
+        for criterion_id in manual_criteria
+    }
+    answers = tuple(
+        OwnerAnswer(
+            question_id=question.question_id,
+            answer="not_sure",
+            explanation="Needs review on the representative page.",
+            page_urls=("https://example.test/representative",),
+        )
+        for question in questions_by_criterion.values()
+    )
+    evaluation = build_hybrid_evaluation(
+        declared_features={},
+        answers=answers,
+        browser_discoveries=(),
+    )
+    criteria = {item["criterion_id"]: item for item in evaluation["criteria"]}
+
+    for criterion_id in manual_criteria:
+        criterion = criteria[criterion_id]
+        self_assessment = criterion["owner_self_assessment"]
+        assert self_assessment["status"] == "assessed_from_owner_answers"
+        assert self_assessment["responses"][0]["answer"] == "not_sure"
+        assert self_assessment["responses"][0]["reported_interpretation"]["outcome"] == "inconclusive"
+        assert self_assessment["reported_outcome"] == "inconclusive"
+        assert self_assessment["responses"][0]["independent_review"] is False
+        assert criterion["manual_review_required"] is True
+        assert self_assessment["criterion_conclusion"] is None
+        assert criterion["compliance_conclusion"] is None
+
+
+def test_owner_self_assessment_preserves_answers_when_browser_evidence_exists():
+    evaluation = build_hybrid_evaluation(
+        declared_features={},
+        answers=(
+            OwnerAnswer(
+                question_id="forms.labels_and_instructions",
+                answer="yes",
+                explanation="Reviewed the public contact form.",
+                page_urls=("https://example.test/contact",),
+            ),
+        ),
+        browser_discoveries=(),
+        browser_checks=(
+            BrowserCriterionEvidence(
+                criterion_id="3.3.2",
+                analyzer_id="axe:label",
+                result_status="incomplete",
+                viewport="desktop",
+                summary="Some form labels require review.",
+                evidence_count=1,
+            ),
+        ),
+    )
+    criterion = next(
+        item for item in evaluation["criteria"] if item["criterion_id"] == "3.3.2"
+    )
+
+    assert criterion["owner_self_assessment"]["status"] == "assessed_from_owner_answers"
+    assert criterion["owner_self_assessment"]["responses"][0]["answer"] == "yes"
+    assert criterion["owner_self_assessment"]["reported_outcome"] == "supports"
+    assert criterion["browser_observed"][0]["result_status"] == "incomplete"
+    assert criterion["status"] == "manual_review_needed"
+    assert criterion["conflicts"] == []
+    assert criterion["compliance_conclusion"] is None
+
+
+def test_owner_support_is_flagged_when_browser_reports_criterion_violation():
+    evaluation = build_hybrid_evaluation(
+        declared_features={},
+        answers=(
+            OwnerAnswer(
+                question_id="forms.labels_and_instructions",
+                answer="yes",
+                page_urls=("https://example.test/contact",),
+            ),
+        ),
+        browser_discoveries=(),
+        browser_checks=(
+            BrowserCriterionEvidence(
+                criterion_id="3.3.2",
+                analyzer_id="axe:label",
+                result_status="violations",
+                viewport="mobile",
+                summary="A visible form control has no associated label.",
+                evidence_count=1,
+            ),
+        ),
+    )
+    criterion = next(
+        item for item in evaluation["criteria"] if item["criterion_id"] == "3.3.2"
+    )
+
+    assert criterion["owner_self_assessment"]["reported_outcome"] == "supports"
+    assert criterion["browser_observed"][0]["result_status"] == "violations"
+    assert len(criterion["conflicts"]) == 1
+    conflict = criterion["conflicts"][0]
+    assert conflict["type"] == "owner_support_browser_concern"
+    assert conflict["browser_evidence"][0]["analyzer_id"] == "axe:label"
+    assert conflict["browser_evidence"][0]["viewport"] == "mobile"
+    assert criterion["compliance_conclusion"] is None
+
+
+def test_browser_pass_does_not_cancel_owner_reported_concern():
+    evaluation = build_hybrid_evaluation(
+        declared_features={},
+        answers=(
+            OwnerAnswer(
+                question_id="forms.labels_and_instructions",
+                answer="no",
+            ),
+        ),
+        browser_discoveries=(),
+        browser_checks=(
+            BrowserCriterionEvidence(
+                criterion_id="3.3.2",
+                analyzer_id="axe:label",
+                result_status="passes",
+                viewport="desktop",
+                summary="Axe rule passed on this viewport.",
+                evidence_count=1,
+            ),
+        ),
+    )
+    criterion = next(
+        item for item in evaluation["criteria"] if item["criterion_id"] == "3.3.2"
+    )
+
+    assert criterion["owner_self_assessment"]["reported_outcome"] == "indicates_concern"
+    assert criterion["browser_observed"][0]["result_status"] == "passes"
+    assert criterion["conflicts"] == []
+    assert criterion["compliance_conclusion"] is None
+
+
+def test_criteria_without_questionnaire_answers_are_not_self_assessed():
+    evaluation = build_hybrid_evaluation(
+        declared_features={},
+        answers=(),
+        browser_discoveries=(),
+    )
+    criterion = next(
+        item for item in evaluation["criteria"] if item["criterion_id"] == "3.3.2"
+    )
+
+    assert criterion["owner_self_assessment"]["status"] == "not_provided"
+    assert criterion["owner_self_assessment"]["responses"] == []
+    assert criterion["owner_self_assessment"]["criterion_conclusion"] is None
+
+
+def test_questionnaire_evaluates_yes_and_no_using_question_specific_polarity():
+    evaluation = build_hybrid_evaluation(
+        declared_features={},
+        answers=(
+            OwnerAnswer(
+                question_id="forms.error_identification",
+                answer="yes",
+            ),
+            OwnerAnswer(
+                question_id="forms.repeated_entry",
+                answer="yes",
+            ),
+            OwnerAnswer(
+                question_id="media.live_captions",
+                answer="no",
+            ),
+        ),
+        browser_discoveries=(),
+    )
+    criteria = {item["criterion_id"]: item for item in evaluation["criteria"]}
+
+    assert criteria["3.3.1"]["owner_self_assessment"]["reported_outcome"] == "supports"
+    assert criteria["3.3.7"]["owner_self_assessment"]["reported_outcome"] == "indicates_concern"
+    assert criteria["1.2.4"]["owner_self_assessment"]["reported_outcome"] == "indicates_concern"
+    assert all(
+        criteria[criterion_id]["compliance_conclusion"] is None
+        for criterion_id in ("3.3.1", "3.3.7", "1.2.4")
+    )
+
+
+def test_shared_question_is_interpreted_only_for_relevant_criterion():
+    evaluation = build_hybrid_evaluation(
+        declared_features={},
+        answers=(
+            OwnerAnswer(question_id="visual.images_of_text", answer="yes"),
+        ),
+        browser_discoveries=(),
+    )
+    criteria = {item["criterion_id"]: item for item in evaluation["criteria"]}
+
+    assert (
+        criteria["1.4.5"]["owner_self_assessment"]["reported_outcome"]
+        == "supports"
+    )
+    assert (
+        criteria["1.1.1"]["owner_self_assessment"]["reported_outcome"]
+        == "context_only"
+    )
+
+
+def test_manual_only_criteria_have_directional_owner_questions_without_claiming_review():
+    from app.analyzers.hybrid_evaluation import (
+        QUESTIONNAIRE_QUESTIONS,
+        _OWNER_ASSESSMENT_YES_MEANING,
+        WCAG_CRITERIA_CATALOG,
+    )
+
+    manual_criteria = {
+        item["criterion_id"]
+        for item in WCAG_CRITERIA_CATALOG
+        if item["coverage_classification"] == "manual_evaluation_required"
+    }
+    directionally_questioned_criteria = {
+        criterion_id
+        for _question_id, criterion_id in _OWNER_ASSESSMENT_YES_MEANING
+    }
+    assert manual_criteria <= directionally_questioned_criteria
+
+    answers = tuple(
+        OwnerAnswer(question_id=question_id, answer="yes")
+        for question_id in {
+            question_id
+            for question_id, _criterion_id in _OWNER_ASSESSMENT_YES_MEANING
+        }
+    )
+    evaluation = build_hybrid_evaluation(
+        declared_features={},
+        answers=answers,
+        browser_discoveries=(),
+    )
+    criteria = {item["criterion_id"]: item for item in evaluation["criteria"]}
+    for criterion_id in manual_criteria:
+        criterion = criteria[criterion_id]
+        assert criterion["owner_self_assessment"]["status"] == "assessed_from_owner_answers"
+        assert criterion["manual_review_required"] is True
+        assert criterion["owner_self_assessment"]["criterion_conclusion"] is None
+        assert criterion["compliance_conclusion"] is None
+
+
 def test_existing_browser_checks_are_added_as_browser_observed_evidence():
     evaluation = build_hybrid_evaluation(
         declared_features={},
@@ -280,6 +535,24 @@ def test_initial_questionnaire_endpoint_discloses_limits_and_safety():
         "scope.user_journeys",
         "scope.features",
     }
+    conditional = {
+        item["question_id"]: item for item in payload["conditional_questions"]
+    }
+    assert conditional["forms.error_identification"]["answer_interpretation"] == {
+        "by_criterion": {
+            "3.3.1": {
+                "yes": "supports",
+                "no": "indicates_concern",
+                "not_sure": "inconclusive",
+                "not_applicable": "not_applicable",
+            }
+        }
+    }
+    assert (
+        conditional["forms.repeated_entry"]["answer_interpretation"]["by_criterion"]
+        ["3.3.7"]["yes"]
+        == "indicates_concern"
+    )
 
 
 def test_browser_feature_discovery_records_visible_feature_candidates():
