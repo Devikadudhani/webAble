@@ -1,0 +1,12 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "fastapi",
+  "buildCommand": "npm ci && npm run build",
+  "functions": {
+    "app/main.py": {
+      "maxDuration": 300,
+      "includeFiles": "docs/wcag-22-coverage-inventory.json",
+      "excludeFiles": "{.venv/**,tests/**,output/**,.pytest_cache/**,frontend/**,node_modules/**}"
+    }
+  }
+}

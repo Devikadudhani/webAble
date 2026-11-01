@@ -43,6 +43,18 @@ starts Uvicorn on Render's assigned port. Deploy the latest commit containing th
 Dockerfile. If a capture returns a report without accessibility evidence, check
 the viewport's accessibility scan status and details in the report.
 
+You can also create the service using the included `render.yaml` Blueprint.
+For an existing service, use the Docker runtime, set the health check path to
+`/health`, and set `WEBABLE_MAX_CONCURRENT_CAPTURES=1` to limit simultaneous
+Chromium sessions on smaller instances. Keep the Python Playwright pin in
+`requirements.txt` aligned with the Docker image version. Deploy this directory
+(`webAble` if deploying from its parent) as the Docker build context.
+
+Empty or non-JSON API responses now show a readable error with the HTTP status.
+If a capture still returns HTTP 502/503/504 after redeploying, check Render's
+runtime logs for a process restart, memory exhaustion, or timeout at that time;
+the frontend cannot recover a report from a terminated server process.
+
 ## Verify
 
 ```sh

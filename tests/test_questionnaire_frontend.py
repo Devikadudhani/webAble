@@ -34,6 +34,9 @@ def _question(question_id, criterion_id, feature_id, prompt):
 
 def test_frontend_is_served_with_accessible_integrated_capture_workflow():
     with TestClient(app) as client:
+        health = client.get("/health")
+        assert health.status_code == 200
+        assert health.json() == {"status": "ok"}
         page = client.get("/")
         assert page.status_code == 200
         assert 'id="root"' in page.text
@@ -54,6 +57,35 @@ def test_questionnaire_contract_exposes_conditional_questions_and_feature_labels
     ids = {item["question_id"] for item in payload["conditional_questions"]}
     assert "forms.error_identification" in ids
     assert "authentication.cognitive_steps" in ids
+
+
+def test_capture_proxy_errors_allow_retry_without_json_parse_errors():
+    async def run():
+        async with async_playwright() as playwright:
+            browser = await playwright.chromium.launch()
+            page = await browser.new_page()
+            await page.add_init_script("""window.fetch = async (url) => {
+                if (url === '/accessibility/questionnaire') {
+                    return Response.json({features: [], conditional_questions: []});
+                }
+                return window.__retry
+                    ? Response.json({requested_url: 'https://example.test', viewports: []})
+                    : new Response('', {status: 502});
+            };""")
+            await mount_react(page)
+            await page.locator("#audit-url").fill("https://example.test")
+            await page.locator("#submit-button").click()
+            await page.wait_for_selector("#form-error")
+            assert "HTTP 502" in await page.locator("#form-error").inner_text()
+            assert "Unexpected end" not in await page.locator("#form-error").inner_text()
+            assert await page.locator("#submit-button").is_enabled()
+            await page.evaluate("window.__retry = true")
+            await page.locator("#submit-button").click()
+            await page.wait_for_selector("#results")
+            assert await page.locator("#form-error").count() == 0
+            await browser.close()
+
+    asyncio.run(run())
 
 
 def test_adaptive_frontend_preserves_answers_and_distinguishes_evidence():

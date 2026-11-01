@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: webable
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: WEBABLE_MAX_CONCURRENT_CAPTURES
+        value: "1"

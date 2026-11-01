@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Header, AuditForm, AuditLoading } from "./components/AuditForm";
 import ResultsDashboard from "./components/ResultsDashboard";
 import { buildRequest, list } from "./utils";
+import { readApiResponse } from "./api.mjs";
 const empty = () => ({
   url: "",
   pages: "",
@@ -23,10 +24,7 @@ export default function App() {
   useEffect(() => {
     const controller = new AbortController();
     fetch("/accessibility/questionnaire", { signal: controller.signal })
-      .then(async (r) => {
-        if (!r.ok) throw Error("Could not load the questionnaire.");
-        return r.json();
-      })
+      .then((r) => readApiResponse(r, "Loading the questionnaire"))
       .then((q) => {
         setCatalog(list(q.features));
         setQuestions(list(q.conditional_questions));
@@ -69,16 +67,7 @@ export default function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(buildRequest(form, answers)),
       });
-      const result = await r.json();
-      if (!r.ok)
-        throw Error(
-          typeof result.detail === "string"
-            ? result.detail
-            : result.detail?.detail ||
-                "The audit request could not be completed.",
-        );
-      if (!result || typeof result !== "object" || Array.isArray(result))
-        throw Error("Invalid audit response.");
+      const result = await readApiResponse(r, "The audit request");
       setResponse(result);
       setQuestions((old) => [
         ...new Map(

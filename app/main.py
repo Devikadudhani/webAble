@@ -99,7 +99,7 @@ CAPTURE_TIMEOUT_SECONDS = (
     / 1_000
     + 15
 )
-MAX_CONCURRENT_CAPTURES = 2
+MAX_CONCURRENT_CAPTURES = max(1, int(os.getenv("WEBABLE_MAX_CONCURRENT_CAPTURES", "2")))
 
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(
@@ -1085,6 +1085,11 @@ async def get_accessibility_questionnaire() -> dict:
             "are not proof of WCAG conformance."
         ),
     }
+
+
+@app.get("/health")
+async def health() -> dict:
+    return {"status": "ok"}
 
 
 app.mount(
