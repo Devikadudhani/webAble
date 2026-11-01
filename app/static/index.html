@@ -1,128 +1,17 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Run a WebAble accessibility audit with website context and evidence for human review.">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="WebAble accessibility evidence workspace"
+    />
     <title>WebAble Audit</title>
-    <link rel="stylesheet" href="/static/styles.css">
+    <script type="module" crossorigin src="/static/assets/index-BM-S-vyf.js"></script>
+    <link rel="stylesheet" crossorigin href="/static/assets/index-FncujTMn.css">
   </head>
   <body>
-    <header class="site-header">
-      <a class="brand" href="/" aria-label="WebAble Audit home">WebAble <span>Audit</span></a>
-      <p>Accessibility evidence, with context</p>
-    </header>
-
-    <main>
-      <section class="intro">
-        <p class="eyebrow">WCAG 2.2 · A/AA audit</p>
-        <h1>Audit a page with the context that matters</h1>
-        <p>Share representative pages and features. WebAble combines your context with browser observations and highlights what still needs human review.</p>
-        <div class="notice" role="note">
-          Owner answers guide the audit; they are not proof of accessibility. Do not enter passwords, personal or customer data, or secrets.
-        </div>
-      </section>
-
-      <form id="audit-form">
-        <section class="panel" aria-labelledby="audit-details-title">
-          <div class="section-heading">
-            <span class="step">01</span>
-            <div>
-              <h2 id="audit-details-title">Audit details</h2>
-              <p>Start with a public page. Add other pages and key journeys to help focus the review.</p>
-            </div>
-          </div>
-          <label class="field-label" for="audit-url">Website URL <span aria-hidden="true">*</span></label>
-          <input id="audit-url" name="url" type="url" placeholder="https://example.com" autocomplete="url" required>
-          <div class="split-fields">
-            <div>
-              <label class="field-label" for="representative-urls">Representative public pages</label>
-              <textarea id="representative-urls" rows="3" placeholder="One public URL per line"></textarea>
-              <p class="field-help">No query strings, fragments, credentials, or private access tokens.</p>
-            </div>
-            <div>
-              <label class="field-label" for="journeys">Important user journeys</label>
-              <textarea id="journeys" rows="3" placeholder="One journey per line: task name | optional public URLs separated by commas"></textarea>
-              <p class="field-help">Describe tasks only. Do not include account details or customer data.</p>
-            </div>
-          </div>
-        </section>
-
-        <section class="panel" aria-labelledby="features-title">
-          <div class="section-heading">
-            <span class="step">02</span>
-            <div>
-              <h2 id="features-title">What does this site include?</h2>
-              <p>Select any features you know are present. Browser discovery may identify more.</p>
-            </div>
-          </div>
-          <fieldset id="feature-list" class="feature-grid">
-            <legend class="visually-hidden">Website features</legend>
-          </fieldset>
-          <label class="check-row">
-            <input id="features-complete" type="checkbox">
-            I’ve reviewed the feature list
-          </label>
-        </section>
-
-        <section id="questions-panel" class="panel" aria-labelledby="questions-title" hidden>
-          <div class="section-heading">
-            <span class="step">03</span>
-            <div>
-              <h2 id="questions-title">A few relevant questions</h2>
-              <p>Questions adapt to your answers and browser discoveries. Your previous answers stay with this audit.</p>
-            </div>
-          </div>
-          <div id="questions-list"></div>
-        </section>
-
-        <section class="panel optional-panel" aria-labelledby="context-title">
-          <div class="section-heading">
-            <span class="step">+</span>
-            <div>
-              <h2 id="context-title">Anything else we should know?</h2>
-              <p>Optional context about unusual workflows, exceptions, or pages that need attention.</p>
-            </div>
-          </div>
-          <label class="visually-hidden" for="free-text">Optional context</label>
-          <textarea id="free-text" rows="3" maxlength="2000" placeholder="Share non-sensitive context only"></textarea>
-        </section>
-
-        <div class="form-actions">
-          <p id="privacy-note">Protected pages can’t be tested without access. Don’t enter passwords here; use a public representative page or arrange a separately authorized review.</p>
-          <button id="submit-button" type="submit">Start accessibility audit</button>
-        </div>
-        <p id="form-error" class="error-message" role="alert" hidden></p>
-      </form>
-
-      <section id="results" class="results" aria-labelledby="results-title" hidden>
-        <div class="results-heading">
-          <div>
-            <p class="eyebrow">Evidence summary</p>
-            <h2 id="results-title" tabindex="-1">Audit context and findings</h2>
-          </div>
-          <span id="audit-status" class="status-pill">Partial evaluation</span>
-        </div>
-        <div id="conflicts" class="conflicts" hidden></div>
-        <div class="evidence-columns">
-          <section aria-labelledby="owner-evidence-title">
-            <h3 id="owner-evidence-title">Owner-reported</h3>
-            <p>Context supplied by you; not independently verified.</p>
-            <div id="owner-evidence"></div>
-          </section>
-          <section aria-labelledby="browser-evidence-title">
-            <h3 id="browser-evidence-title">Browser-observed</h3>
-            <p>Feature candidates from the captured page and viewport. Detection does not prove a failure.</p>
-            <div id="browser-evidence"></div>
-          </section>
-        </div>
-        <section class="criterion-summary" aria-labelledby="criterion-summary-title">
-          <h3 id="criterion-summary-title">Criterion evaluation summary</h3>
-          <p>Owner answers provide context, while browser checks provide bounded evidence. Neither alone establishes WCAG conformance.</p>
-          <div id="criterion-summary"></div>
-        </section>
-      </section>
-    </main>
-    <script src="/static/questionnaire.js" defer></script>
+    <div id="root"></div>
   </body>
 </html>
