@@ -1,17 +1,70 @@
 // Proxies can return empty or HTML error responses before FastAPI is reached.
-export async function runAudit(payload, { fetcher = fetch, pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms)) } = {}) {
-  const submission = await readApiResponse(await fetcher("/captures/jobs", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  }), "The audit request");
+const POLL_INTERVAL_MS = 2_000;
+const REQUEST_TIMEOUT_MS = 30_000;
+const MAX_AUDIT_WAIT_MS = 15 * 60 * 1_000;
+
+export async function runAudit(
+  payload,
+  {
+    fetcher = fetch,
+    pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+    now = Date.now,
+    maxWaitMs = MAX_AUDIT_WAIT_MS,
+    requestTimeoutMs = REQUEST_TIMEOUT_MS,
+  } = {},
+) {
+  const startedAt = now();
+  const submission = await readApiResponse(
+    await fetchWithTimeout(
+      fetcher,
+      "/captures/jobs",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      },
+      requestTimeoutMs,
+    ),
+    "The audit request",
+  );
   if (!submission.job_id) throw new Error("The server did not return an audit ID.");
-  for (;;) {
-    await pause(2000);
-    const job = await readApiResponse(await fetcher(`/captures/jobs/${encodeURIComponent(submission.job_id)}`), "Checking the audit");
+  while (now() - startedAt < maxWaitMs) {
+    await pause(Math.min(POLL_INTERVAL_MS, maxWaitMs - (now() - startedAt)));
+    if (now() - startedAt >= maxWaitMs) break;
+    const job = await readApiResponse(
+      await fetchWithTimeout(
+        fetcher,
+        `/captures/jobs/${encodeURIComponent(submission.job_id)}`,
+        {},
+        requestTimeoutMs,
+      ),
+      "Checking the audit",
+    );
     if (job.status === "completed") return job.result;
     if (job.status === "failed") throw new Error(job.error?.detail || "The audit failed. Please try again.");
     if (job.status !== "pending") throw new Error("The server returned an unknown audit status.");
+  }
+  throw new Error(
+    "The audit is still pending after 15 minutes. The server may have restarted or be overloaded. Check the Render logs, then try again.",
+  );
+}
+
+async function fetchWithTimeout(fetcher, url, options, timeoutMs) {
+  const controller = new AbortController();
+  let timeoutId;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => {
+      controller.abort();
+      reject(new Error("The server did not respond in time. Please try again."));
+    }, timeoutMs);
+  });
+  try {
+    return await Promise.race([
+      fetcher(url, { ...options, signal: controller.signal }),
+      timeout,
+    ]);
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 

@@ -252,7 +252,12 @@ export function AuditLoading() {
       <p className="eyebrow">AUDIT IN PROGRESS</p>
       <h2>Waiting for your audit results</h2>
       <div className="indeterminate" aria-hidden="true" />
-      <p>Your audit may be queued while other audits finish. Checks run on the server; you can keep this page open for the results.</p>
+      <p>
+        Your audit may be queued while other audits finish. Checks run on the
+        server and cover desktop, tablet, and mobile, so results can take
+        several minutes. A 404 from the website being audited may be recorded
+        as a finding; it does not necessarily mean your audit failed.
+      </p>
       <ul className="stages">
         {[
           "Opening website",

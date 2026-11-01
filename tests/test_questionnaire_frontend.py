@@ -68,6 +68,9 @@ def test_capture_proxy_errors_allow_retry_without_json_parse_errors():
                 if (url === '/accessibility/questionnaire') {
                     return Response.json({features: [], conditional_questions: []});
                 }
+                if (window.__missingJob && url.startsWith('/captures/jobs/')) {
+                    return Response.json({detail: 'This audit expired or the server restarted.'}, {status: 404});
+                }
                 if (window.__retry && url === '/captures/jobs') return Response.json({job_id: 'test'});
                 return window.__retry
                     ? Response.json({status: 'completed', result: {requested_url: 'https://example.test', viewports: []}})
@@ -84,6 +87,12 @@ def test_capture_proxy_errors_allow_retry_without_json_parse_errors():
             await page.locator("#submit-button").click()
             await page.wait_for_selector("#results")
             assert await page.locator("#form-error").count() == 0
+            await page.evaluate("window.__missingJob = true")
+            await page.locator("#run-again").click()
+            await page.wait_for_selector("#form-error")
+            assert "server restarted" in await page.locator("#form-error").inner_text()
+            assert await page.locator("#audit-loading").is_hidden()
+            assert await page.locator("#submit-button").is_enabled()
             await browser.close()
 
     asyncio.run(run())
