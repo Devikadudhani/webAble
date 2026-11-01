@@ -15,7 +15,7 @@ from app.analyzers.element_horizontal_overflow import (
 )
 from app.analyzers.element_layout_evidence import enrich_element_layout_evidence
 from app.analyzers.keyboard_focus import audit_keyboard_focus
-from app.analyzers.text_reflow import audit_text_reflow
+from app.analyzers.text_reflow import _MEASURE_PAGE, audit_text_reflow
 from app.capture.runner import BrowserCapture
 from app.capture.responsive import capture_responsive_viewports
 from app.capture.storage import LocalScreenshotStorage
@@ -479,6 +479,7 @@ def test_responsive_pipeline_analyzes_local_overflow_fixture(capture, fixture_se
     assert results[0].horizontal_overflow.potential_horizontal_overflow is False
     assert results[1].horizontal_overflow.potential_horizontal_overflow is True
     assert results[2].horizontal_overflow.potential_horizontal_overflow is True
+
     assert results[0].element_overflow_diagnosis.findings == []
     for result in results[1:]:
         findings = result.element_overflow_diagnosis.findings
@@ -493,6 +494,32 @@ def test_responsive_pipeline_analyzes_local_overflow_fixture(capture, fixture_se
         assert normalized[0].viewport_name == result.name
         assert normalized[0].evidence_correlation == "direct_geometry_match"
 
+
+def test_responsive_pipeline_reuses_browser_but_closes_each_viewport_context(
+    fixture_server, tmp_path
+):
+    service = BrowserCapture(
+        storage=LocalScreenshotStorage(tmp_path),
+        url_validator=LocalhostValidator(),
+        settling_period_ms=0,
+        reuse_browser=True,
+    )
+
+    async def run():
+        browser = None
+        try:
+            results = await capture_responsive_viewports(
+                f"{fixture_server}/normal", service.capture
+            )
+            browser = service._browser
+            assert browser is not None and browser.is_connected()
+            assert len(results) == 3
+            assert all(result.capture_outcome == "completed" for result in results)
+        finally:
+            await service.close()
+        assert browser is not None and not browser.is_connected()
+
+    asyncio.run(run())
 
 def test_functional_ux_audit_checks_links_and_images_locally(
     capture, fixture_server
@@ -904,6 +931,52 @@ def test_text_reflow_usable_fixture_has_no_detected_clipping(fixture_server):
     assert text_scenario.criterion_ids == ["1.4.4"]
     assert text_scenario.measurement.window_inner_width == 1365
     assert text_scenario.baseline_measurement.window_inner_width == 1365
+
+
+def test_text_measurement_caches_unique_paths_and_bounds_candidate_discovery():
+    async def run():
+        async with async_playwright() as playwright:
+            browser = await playwright.chromium.launch()
+            page = await browser.new_page()
+            try:
+                await page.set_content(
+                    """<main id="container">
+                      <div id="duplicate"><p>first duplicate</p></div>
+                      <div id="duplicate"><p>second duplicate</p></div>
+                    </main>
+                    <script>
+                      for (let index = 0; index < 400; index += 1) {
+                        const paragraph = document.createElement("p");
+                        paragraph.textContent = `Paragraph ${index}`;
+                        document.body.append(paragraph);
+                      }
+                    </script>"""
+                )
+                result = await page.evaluate(
+                    _MEASURE_PAGE,
+                    {"maxElements": 300, "enlargeText": False},
+                )
+                assert result["inspectedTextElements"] == 300
+                assert result["candidatesTruncated"] is True
+                for expected in ("first duplicate", "second duplicate"):
+                    selectors = [
+                        item["selector"]
+                        for item in result["elements"]
+                        if await page.evaluate(
+                            "(selector) => document.querySelector(selector)?.textContent.trim()",
+                            item["selector"],
+                        )
+                        == expected
+                    ]
+                    assert len(selectors) == 1
+                    assert await page.evaluate(
+                        "(selector) => document.querySelectorAll(selector).length",
+                        selectors[0],
+                    ) == 1
+            finally:
+                await browser.close()
+
+    asyncio.run(run())
 
 
 def test_text_reflow_clipped_text_requires_availability_review(fixture_server):

@@ -1,8 +1,10 @@
 {
   "dependencies": {
     "axe-core": "4.14.0",
+    "lucide-react": "^1.66.0",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "recharts": "^3.10.1"
   },
   "scripts": {
     "dev": "vite --host 127.0.0.1",

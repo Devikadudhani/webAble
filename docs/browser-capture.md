@@ -14,6 +14,9 @@ periods, bounded link-check budget, and accessibility scan budget. Each successf
 viewport response includes document-level horizontal overflow measurements and a separate
 element-level diagnosis from the same live page; diagnosis failures do not
 discard a successful capture or screenshot.
+The service reuses one Chromium process between captures; every viewport still
+gets a fresh browser context that is closed after its evidence is collected.
+The shared browser is closed during application shutdown.
 Each raw element candidate also carries bounded layout evidence when available:
 its scroll/client widths, bounding geometry, computed sizing and positioning
 styles, up to five ancestors, and up to eight oversized descendants from a bounded
@@ -244,7 +247,10 @@ text-bearing elements. It compares text geometry and overlap, container
 overflow, visibility, and sampled hit-testing for interactive controls against
 that baseline. Findings include selectors, measured geometry, viewport
 dimensions, relevant baseline/current measurements, and control occluders when
-detected. All findings are `needs_review`: geometry cannot prove actual loss of
+detected. Selector paths are cached per measurement, and candidate discovery
+stops checking computed visibility after finding the 301st text-bearing element;
+the first 300 remain measured and larger pages are marked truncated. All
+findings are `needs_review`: geometry cannot prove actual loss of
 text or functionality. Existing scrollable containers are identified and are
 not automatically treated as failures; spacing-induced changes within them
 remain review evidence. Original inline values and priorities for all four CSS

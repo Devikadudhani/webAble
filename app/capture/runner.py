@@ -1,8 +1,10 @@
+import asyncio
 import logging
 import re
 import struct
 import time
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from typing import Protocol, TypeVar
 
@@ -11,6 +13,7 @@ from playwright.async_api import (
     BrowserContext,
     Error as PlaywrightError,
     Page,
+    Playwright,
     Request,
     TimeoutError as PlaywrightTimeoutError,
     async_playwright,
@@ -50,11 +53,66 @@ class BrowserCapture:
         url_validator: URLValidator,
         navigation_timeout_ms: int = 15_000,
         settling_period_ms: int = 1_500,
+        reuse_browser: bool = False,
     ) -> None:
         self._storage = storage
         self._url_validator = url_validator
         self._navigation_timeout_ms = navigation_timeout_ms
         self._settling_period_ms = settling_period_ms
+        self._reuse_browser = reuse_browser
+        self._playwright: Playwright | None = None
+        self._browser: Browser | None = None
+        self._browser_lock = asyncio.Lock()
+
+    @asynccontextmanager
+    async def _browser_session(self) -> AsyncIterator[tuple[Browser, bool]]:
+        if self._reuse_browser:
+            yield await self._get_reusable_browser(), False
+            return
+
+        async with async_playwright() as playwright:
+            try:
+                browser = await playwright.chromium.launch()
+            except PlaywrightError as error:
+                raise BrowserCaptureError(
+                    "Chromium could not start a capture session."
+                ) from error
+            yield browser, True
+
+    async def _get_reusable_browser(self) -> Browser:
+        async with self._browser_lock:
+            if self._browser is not None and self._browser.is_connected():
+                return self._browser
+
+            if self._playwright is not None:
+                await self._playwright.stop()
+            try:
+                self._playwright = await async_playwright().start()
+                browser = await self._playwright.chromium.launch()
+                self._browser = browser
+            except PlaywrightError as error:
+                if self._playwright is not None:
+                    await self._playwright.stop()
+                self._playwright = None
+                self._browser = None
+                raise BrowserCaptureError(
+                    "Chromium could not start a capture session."
+                ) from error
+            return browser
+
+    async def close(self) -> None:
+        browser, self._browser = self._browser, None
+        playwright, self._playwright = self._playwright, None
+        errors = await _close_resources(None, None, browser)
+        if playwright is not None:
+            try:
+                await playwright.stop()
+            except Exception as error:
+                errors.append(error)
+        if errors:
+            raise BrowserCaptureError(
+                "The shared Chromium browser could not be closed cleanly."
+            ) from errors[0]
 
     async def save_scenario_screenshot(
         self,
@@ -114,14 +172,12 @@ class BrowserCapture:
             scanned_at=datetime.now(timezone.utc),
         )
 
-        browser: Browser | None = None
         context: BrowserContext | None = None
         page: Page | None = None
-        async with async_playwright() as playwright:
+        async with self._browser_session() as (browser, close_browser):
             primary_error: BaseException | None = None
             try:
                 try:
-                    browser = await playwright.chromium.launch()
                     context = await browser.new_context(
                         viewport={"width": width, "height": height},
                         service_workers="block",
@@ -185,7 +241,11 @@ class BrowserCapture:
                 primary_error = error
                 raise
             finally:
-                cleanup_errors = await _close_resources(page, context, browser)
+                cleanup_errors = await _close_resources(
+                    page,
+                    context,
+                    browser if close_browser else None,
+                )
                 if cleanup_errors:
                     if primary_error is None:
                         raise BrowserCaptureError(

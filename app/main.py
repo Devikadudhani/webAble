@@ -1,6 +1,8 @@
 import asyncio
 import os
 import sys
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 import time
 import logging
 from uuid import uuid4
@@ -113,7 +115,6 @@ if sys.platform == "win32":
         asyncio.WindowsProactorEventLoopPolicy()
     )
 
-app = FastAPI(title="WebAble Browser Capture", version="0.1.0")
 capture_slots = asyncio.Semaphore(MAX_CONCURRENT_CAPTURES)
 url_validator = PublicURLSafetyValidator()
 capture_service = BrowserCapture(
@@ -121,6 +122,22 @@ capture_service = BrowserCapture(
     url_validator=url_validator,
     navigation_timeout_ms=NAVIGATION_TIMEOUT_MS,
     settling_period_ms=SETTLING_PERIOD_MS,
+    reuse_browser=True,
+)
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    try:
+        yield
+    finally:
+        await capture_service.close()
+
+
+app = FastAPI(
+    title="WebAble Browser Capture",
+    version="0.1.0",
+    lifespan=lifespan,
 )
 
 

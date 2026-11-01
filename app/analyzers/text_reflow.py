@@ -109,26 +109,42 @@ ScenarioScreenshotCapture = Callable[
 
 _MEASURE_PAGE = """async (options) => {
     const maxElements = options.maxElements;
+    const all = document.querySelectorAll("*");
+    const idCounts = new Map();
+    const textCandidates = [];
+    const selectorCache = new WeakMap();
     const selectorFor = (element) => {
-      if (element.id) {
-        const idSelector = `#${CSS.escape(element.id)}`;
-        if (document.querySelectorAll(idSelector).length === 1) return idSelector;
-      }
-      const parts = [];
+      const cached = selectorCache.get(element);
+      if (cached) return cached;
+
+      const chain = [];
       let node = element;
-      while (node && node.nodeType === Node.ELEMENT_NODE) {
-        let part = node.tagName.toLowerCase();
-        if (node.parentElement) {
-          const sameTag = [...node.parentElement.children]
-            .filter(child => child.tagName === node.tagName);
-          if (sameTag.length > 1) part += `:nth-of-type(${sameTag.indexOf(node) + 1})`;
+      while (
+        node &&
+        node.nodeType === Node.ELEMENT_NODE &&
+        !selectorCache.has(node)
+      ) {
+        if (node.id && idCounts.get(node.id) === 1) {
+          selectorCache.set(node, `#${CSS.escape(node.id)}`);
+          break;
         }
-        parts.unshift(part);
-        const candidate = parts.join(" > ");
-        if (document.querySelectorAll(candidate).length === 1) return candidate;
+        chain.push(node);
         node = node.parentElement;
       }
-      return parts.join(" > ");
+
+      let selector = node ? selectorCache.get(node) || "" : "";
+      for (let index = chain.length - 1; index >= 0; index -= 1) {
+        const current = chain[index];
+        let part = current.tagName.toLowerCase();
+        const parent = current.parentElement;
+        if (parent && parent.children.length > 1) {
+          const childIndex = [...parent.children].indexOf(current) + 1;
+          part += `:nth-child(${childIndex})`;
+        }
+        selector = selector ? `${selector} > ${part}` : part;
+        selectorCache.set(current, selector);
+      }
+      return selectorCache.get(element) || "";
     };
     const contentSignatureFor = (element) => {
       const controlValue = element.matches("input,textarea,select")
@@ -156,14 +172,24 @@ _MEASURE_PAGE = """async (options) => {
       [...element.childNodes].some(node =>
         node.nodeType === Node.TEXT_NODE && node.textContent.trim().length > 0
       ) || element.matches("input,textarea,select,button,[role=button]");
+    for (const element of all) {
+      if (element.id) {
+        idCounts.set(element.id, (idCounts.get(element.id) || 0) + 1);
+      }
+      if (
+        textCandidates.length <= maxElements &&
+        visible(element) &&
+        textBearing(element)
+      ) {
+        textCandidates.push(element);
+      }
+    }
     const originalViewport = {
       width: window.innerWidth,
       height: window.innerHeight
     };
     const doc = document.documentElement;
     const body = document.body;
-    const all = [...document.querySelectorAll("*")];
-    const textCandidates = all.filter(element => visible(element) && textBearing(element));
     const originalInlineStyles = [];
     const originalSpacingStyles = [];
     let retainInlineStyles = false;
