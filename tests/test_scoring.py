@@ -460,7 +460,7 @@ def test_missing_viewport_and_empty_scan_do_not_become_passes():
     assert _criterion(scoring, "accessibility.automated_checks")["status"] == "needs_review"
     assert scoring["overall_score"] is None
     assert scoring["overall_scoring_status"] == "insufficient_evidence"
-    assert scoring["minimum_overall_coverage"] == 40.0
+    assert scoring["minimum_overall_coverage"] == 30.0
 
 
 def test_distinct_scenario_evidence_is_not_collapsed():
@@ -542,8 +542,8 @@ def test_empty_scan_reports_viewport_gaps_and_score_unavailable_requirements():
         item for item in scoring["score_unavailable"]["dimensions"]
         if item["dimension_id"] == "accessibility"
     )
-    assert accessibility["required_conclusive_criteria"] == 4
-    assert accessibility["additional_conclusive_criteria_needed"] == 4
+    assert accessibility["required_conclusive_criteria"] == 3
+    assert accessibility["additional_conclusive_criteria_needed"] == 3
     assert accessibility["unresolved_criteria"]
     assert all(
         item["action"] == "Run the missing check."
@@ -631,7 +631,9 @@ def test_score_unavailable_actions_distinguish_review_not_tested_and_error():
         ),
         target_size_audit=TargetSizeAuditResult(status="unavailable"),
     )
-    scoring = build_audit_scoring(results)
+    scoring = build_audit_scoring(
+        results, replace(DEFAULT_SCORING_CONFIGURATION, minimum_overall_coverage=99.0)
+    )
     accessibility = next(
         item for item in scoring["score_unavailable"]["dimensions"]
         if item["dimension_id"] == "accessibility"
@@ -656,10 +658,10 @@ def test_scoring_emits_wcag_metadata_evidence_strength_counts_and_version():
     assert keyboard["principle"] == "Operable"
     assert keyboard["evidence_strength"] == "bounded_probe"
     assert target_size["evidence_strength"] == "heuristic"
-    assert scoring["scoring_configuration_version"] == "1.2.0"
+    assert scoring["scoring_configuration_version"] == "1.3.0"
     assert sum(scoring["status_counts"].values()) == len(scoring["criteria"])
 
-    next_version = replace(DEFAULT_SCORING_CONFIGURATION, version="1.3.0")
+    next_version = replace(DEFAULT_SCORING_CONFIGURATION, version="1.4.0")
     rescored = build_audit_scoring(_results(), next_version)
     assert rescored["scoring_configuration_version"] != scoring["scoring_configuration_version"]
 

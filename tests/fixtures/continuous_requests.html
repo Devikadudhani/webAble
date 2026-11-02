@@ -1,0 +1,4 @@
+<!doctype html><html><head><title>Continuous request fixture</title></head><body>
+<main><h1>Available content</h1><p>This page keeps a background request active without blocking user-visible content.</p><button>Continue</button></main>
+<script>setInterval(()=>fetch('/pulse').catch(()=>{}),100);</script>
+</body></html>

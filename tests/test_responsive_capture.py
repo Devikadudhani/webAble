@@ -39,6 +39,14 @@ class FakePage:
                     "overflowBoundaries": [],
                     "overlapPairs": [],
                 }
+            if "tags" in argument or "rules" in argument:
+                return {
+                    "testEngine": {"version": "4.14.0"},
+                    "violations": [],
+                    "incomplete": [],
+                    "passes": [],
+                    "inapplicable": [],
+                }
             return {
                 "links": [],
                 "images": [],
@@ -232,8 +240,8 @@ def test_prohibited_url_prevents_repeated_capture_attempts():
     [
         (None, 390, "completed", "ready", "missing_dimensions"),
         (400, None, "completed", "ready", "missing_dimensions"),
-        (390, 390, "partial", "partial", "capture_incomplete"),
-        (390, 390, "navigation_timeout", "partial", "capture_incomplete"),
+        (390, 390, "partial", "partial", "available"),
+        (390, 390, "navigation_timeout", "partial", "available"),
     ],
 )
 def test_missing_dimensions_or_incomplete_capture_is_not_reported_clean(
@@ -255,13 +263,12 @@ def test_missing_dimensions_or_incomplete_capture_is_not_reported_clean(
         responsive.capture_responsive_viewports("https://example.test", capture)
     )
 
-    assert all(result.horizontal_overflow is None for result in results)
+    if scroll_width is None or visible_width is None:
+        assert all(result.horizontal_overflow is None for result in results)
+    else:
+        assert all(result.horizontal_overflow is not None for result in results)
     assert all(result.overflow_analysis_status == status for result in results)
-    expected_functional_status = (
-        "not_attempted"
-        if outcome != "completed" or readiness != "ready"
-        else "available"
-    )
+    expected_functional_status = "available"
     assert all(
         result.functional_ux_audit.status == expected_functional_status
         for result in results

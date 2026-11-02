@@ -1,0 +1,4 @@
+<!doctype html><html><head><title>Delayed API fixture</title></head><body>
+<main><h1>Product catalog</h1><div id="items" aria-busy="true">Loading products</div></main>
+<script>fetch('/slow-api').then(r=>r.json()).then(data=>{const el=document.querySelector('#items');el.textContent=data.products.join(' · ');el.setAttribute('aria-busy','false');});</script>
+</body></html>

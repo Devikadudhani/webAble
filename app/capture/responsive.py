@@ -41,6 +41,7 @@ from app.analyzers.horizontal_overflow import (
     analyze_horizontal_overflow,
 )
 from app.capture.models import (
+    AccessStatus,
     BrowserEvidence,
     CaptureOutcome,
     FailedRequest,
@@ -70,6 +71,7 @@ ElementDiagnoser = Callable[
 ViewportCaptureOutcome = CaptureOutcome | Literal[
     "capture_failed", "not_attempted"
 ]
+AnalyzerExecutionStatus = Literal["completed", "partial", "not_run"]
 OverflowAnalysisStatus = Literal[
     "available", "missing_dimensions", "capture_incomplete", "not_attempted"
 ]
@@ -89,6 +91,18 @@ class TechnicalEvidenceResult:
     console_errors: list[str] = field(default_factory=list)
     runtime_errors: list[str] = field(default_factory=list)
     failed_requests: list[FailedRequest] = field(default_factory=list)
+    redirect_chains: list[list[str]] = field(default_factory=list)
+    unloaded_image_count: int | None = None
+    loading_indicator_count: int | None = None
+    visible_content_characters: int = 0
+    access_restriction_signals: list[str] = field(default_factory=list)
+    access_restriction_provider: str | None = None
+    access_restriction_reference: str | None = None
+    main_document_http_status: int | None = None
+    access_status: AccessStatus = "unavailable"
+    primary_content_characters: int = 0
+    primary_content_items: int = 0
+    readiness_elapsed_ms: int = 0
     details: list[str] = field(default_factory=list)
 
 
@@ -116,6 +130,7 @@ class ViewportCaptureResult:
     screenshot_ref: str | None
     element_overflow_diagnosis: ElementOverflowDiagnosisResult
     finding_normalization: FindingNormalizationResult
+    analyzer_execution_status: AnalyzerExecutionStatus = "not_run"
     details: list[str] = field(default_factory=list)
     functional_ux_audit: FunctionalUXAuditResult = field(
         default_factory=lambda: FunctionalUXAuditResult(
@@ -230,17 +245,25 @@ async def capture_responsive_viewports(
             status="not_attempted",
             details=("Browser feature discovery was not attempted because capture was incomplete.",),
         )
+        analysis_attempted = False
         text_reflow = TextReflowAuditResult(
             status="not_tested",
             details=["Text scaling and reflow audit was not attempted because capture was incomplete."],
         )
 
         async def diagnose_live_page(page: PageEvaluator) -> None:
-            nonlocal diagnosis, functional_audit, accessibility, keyboard_focus, text_reflow, target_size, feature_discovery
-            feature_discovery = await discover_browser_features(
-                page,
-                viewport=name,
-            )
+            nonlocal diagnosis, functional_audit, accessibility, keyboard_focus, text_reflow, target_size, feature_discovery, analysis_attempted
+            analysis_attempted = True
+            try:
+                feature_discovery = await discover_browser_features(
+                    page,
+                    viewport=name,
+                )
+            except Exception as error:
+                feature_discovery = BrowserFeatureDiscovery(
+                    status="unavailable",
+                    details=(f"Browser feature discovery failed ({type(error).__name__}).",),
+                )
             try:
                 findings = await diagnoser(page, viewport.width)
             except Exception as error:
@@ -298,7 +321,13 @@ async def capture_responsive_viewports(
                         f"Keyboard/focus audit failed ({type(error).__name__})."
                     ],
                 )
-            target_size = await audit_target_size(page)
+            try:
+                target_size = await audit_target_size(page)
+            except Exception as error:
+                target_size = TargetSizeAuditResult(
+                    status="unavailable",
+                    details=[f"Target-size audit failed ({type(error).__name__})."],
+                )
             try:
                 text_reflow = await audit_text_reflow(
                     page,
@@ -405,6 +434,11 @@ async def capture_responsive_viewports(
             evidence.outcome == "completed"
             and evidence.readiness_status == "ready"
         )
+        analyzer_execution_status = (
+            "not_run" if not analysis_attempted
+            else "completed" if capture_is_complete
+            else "partial"
+        )
         technical_evidence = TechnicalEvidenceResult(
             status="available" if capture_is_complete else "partial",
             page_url=evidence.final_url or evidence.requested_url,
@@ -413,9 +447,21 @@ async def capture_responsive_viewports(
             console_errors=list(evidence.console_errors),
             runtime_errors=list(evidence.uncaught_page_errors),
             failed_requests=list(evidence.failed_requests),
+            redirect_chains=list(evidence.redirect_chains),
+            unloaded_image_count=evidence.unloaded_image_count,
+            loading_indicator_count=evidence.loading_indicator_count,
+            visible_content_characters=evidence.visible_content_characters,
+            access_restriction_signals=list(evidence.access_restriction_signals),
+            access_restriction_provider=evidence.access_restriction_provider,
+            access_restriction_reference=evidence.access_restriction_reference,
+            main_document_http_status=evidence.main_document_http_status,
+            access_status=evidence.access_status,
+            primary_content_characters=evidence.primary_content_characters,
+            primary_content_items=evidence.primary_content_items,
+            readiness_elapsed_ms=evidence.readiness_elapsed_ms,
             details=list(evidence.details),
         )
-        if capture_is_complete and evidence.screenshot_ref:
+        if analysis_attempted and evidence.screenshot_ref:
             text_reflow = replace(
                 text_reflow,
                 scenarios=[
@@ -425,7 +471,7 @@ async def capture_responsive_viewports(
                     for scenario in text_reflow.scenarios
                 ],
             )
-        if not capture_is_complete:
+        if not analysis_attempted:
             functional_audit = FunctionalUXAuditResult(
                 status="not_attempted",
                 details=[
@@ -454,7 +500,7 @@ async def capture_responsive_viewports(
                 status="not_tested",
                 details=["Text scaling and reflow audit was not attempted because capture was incomplete."],
             )
-        if not capture_is_complete:
+        if not analysis_attempted:
             analysis_status: OverflowAnalysisStatus = "capture_incomplete"
             details.append(
                 "Horizontal-overflow analysis was skipped because the capture was incomplete."
@@ -471,6 +517,10 @@ async def capture_responsive_viewports(
             overflow = None
         else:
             analysis_status = "available"
+            if not capture_is_complete:
+                details.append(
+                    "Document overflow was measured on a partial capture; interpret it as partial evidence."
+                )
             overflow = analyze_horizontal_overflow(
                 scroll_width=evidence.document.scroll_width,
                 visible_width=evidence.document.visible_width,
@@ -506,6 +556,7 @@ async def capture_responsive_viewports(
                 name=name,
                 viewport=viewport,
                 capture_outcome=evidence.outcome,
+                analyzer_execution_status=analyzer_execution_status,
                 horizontal_overflow=overflow,
                 overflow_analysis_status=analysis_status,
                 screenshot_ref=evidence.screenshot_ref,

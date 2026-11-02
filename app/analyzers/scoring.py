@@ -37,7 +37,7 @@ ScoringStatus = Literal[
     "not_scored",
 ]
 
-SCORING_CONFIGURATION_VERSION = "1.2.0"
+SCORING_CONFIGURATION_VERSION = "1.3.0"
 VIEWPORT_ORDER = ("desktop", "tablet", "mobile")
 
 _NAME_RULES = frozenset(
@@ -91,16 +91,16 @@ class ScoringConfiguration:
     coverage_thresholds: tuple[tuple[float, str], ...] = (
         (90.0, "high"),
         (70.0, "moderate"),
-        (40.0, "limited"),
+        (30.0, "limited"),
         (0.0, "very_limited"),
     )
     score_validity_thresholds: tuple[tuple[float, ScoringStatus], ...] = (
         (90.0, "valid_high_coverage"),
         (70.0, "valid_moderate_coverage"),
-        (40.0, "provisional"),
+        (30.0, "provisional"),
         (0.0, "insufficient_evidence"),
     )
-    minimum_overall_coverage: float = 40.0
+    minimum_overall_coverage: float = 30.0
     score_labels: tuple[tuple[float, str], ...] = (
         (90.0, "excellent"),
         (80.0, "good"),
@@ -305,7 +305,7 @@ CRITERIA = (
         "Broken or invalid links",
         "functional_reliability",
         4,
-        "Bounded HEAD checks of up to 15 rendered links per viewport.",
+        "Bounded HEAD checks, with a ranged GET fallback for destinations that reject HEAD, on up to 15 rendered links per viewport.",
         ("functional_ux",),
         evidence_strength="bounded_probe",
     ),
@@ -350,7 +350,7 @@ CRITERIA = (
         "JavaScript console errors",
         "technical_reliability",
         4,
-        "Recorded console.error events; uncaught page exceptions are evaluated separately.",
+        "Recorded console.error events during the usable browser capture window; uncaught page exceptions are evaluated separately.",
         ("browser_console",),
         evidence_strength="deterministic",
     ),
@@ -635,7 +635,11 @@ def _normalize_axe(
         ]
         if audit.status == "unavailable":
             observation = _Observation(
-                viewport, "error", "axe_core", details="Accessibility scan was unavailable."
+                viewport,
+                "error",
+                "axe_core",
+                details="Accessibility scan was unavailable.",
+                limitations=tuple(audit.details),
             )
         elif audit.status == "not_attempted":
             observation = _Observation(
@@ -1060,6 +1064,17 @@ def _normalize_technical(
     observations: dict[str, list[_Observation]],
 ) -> None:
     technical = result.technical_evidence
+    observation_window_available = technical.status == "available" or (
+        result.analyzer_execution_status in ("completed", "partial")
+        and technical.status == "partial"
+        and technical.access_status in ("accessible", "partial")
+        and technical.readiness_status in ("ready", "partial")
+    )
+    observation_limitations = tuple(technical.details)
+    if observation_window_available and technical.status == "partial":
+        observation_limitations += (
+            "No-error conclusions cover the usable portion of a partial capture, not events outside that observation window.",
+        )
     categories = (
         (
             "technical.console_errors",
@@ -1081,7 +1096,7 @@ def _normalize_technical(
             status = "error"
         elif technical.status == "not_tested":
             status = "not_tested"
-        elif technical.status == "available":
+        elif observation_window_available:
             status = "pass"
         else:
             status = "needs_review"
@@ -1092,12 +1107,12 @@ def _normalize_technical(
                 analyzer_id,
                 details=f"{len(issues)} browser error event(s) were recorded."
                 if issues
-                else "No browser error events were recorded."
+                else "No browser error events were recorded during the observed capture window."
                 if status == "pass"
                 else "Browser error evidence is incomplete.",
                 data=list(issues),
                 confidence="high" if issues else "medium" if status == "pass" else None,
-                limitations=tuple(technical.details)
+                limitations=observation_limitations
                 + (
                     (
                         "A console.error event alone does not establish a user-facing defect; review its context. Uncaught page exceptions are tracked separately.",
@@ -1123,7 +1138,7 @@ def _normalize_technical(
         network_status: CriterionStatus = "fail"
     elif review_failures:
         network_status = "needs_review"
-    elif technical.status == "available":
+    elif observation_window_available:
         network_status = "pass"
     elif technical.status == "unavailable":
         network_status = "error"
@@ -1140,13 +1155,13 @@ def _normalize_technical(
                 f"{len(first_party_http_failures)} first-party HTTP failure(s), "
                 f"{len(review_failures)} third-party or ambiguous request failure(s) were recorded."
                 if failed
-                else "No failed requests were recorded."
+                else "No failed requests were recorded during the observed capture window."
                 if network_status == "pass"
                 else "Network request evidence is incomplete."
             ),
             data=[_plain(item) for item in failed],
             confidence="high" if first_party_http_failures else None,
-            limitations=tuple(technical.details)
+            limitations=observation_limitations
             + (
                 (
                     "Third-party HTTP failures, non-HTTP failures, and requests whose origin could not be established require review.",
@@ -1562,6 +1577,9 @@ def _score_unavailable(
                     "not_tested": "Run the missing check.",
                     "error": "Resolve the analyzer or capture error.",
                 }[criterion["status"]],
+                "diagnostic": " ".join(criterion.get("limitations", []))[:500]
+                if criterion["status"] == "error"
+                else None,
             }
             for criterion in criteria
             if criterion["dimension"] == dimension["dimension_id"]

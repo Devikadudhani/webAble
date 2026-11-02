@@ -122,6 +122,16 @@ p {
   background:#fff;
   min-width:0
 }
+.access-warning {
+  border: 1px solid #b56b00;
+  border-left: 4px solid #b56b00;
+  padding: 16px 20px;
+  margin: 18px 0;
+  background: #fff8e8;
+  color: #352500;
+}
+.access-warning h3 { margin: 0 0 8px; }
+.access-warning p { margin: 6px 0; }
 .landing #audit-form {
   max-width:760px
 }
@@ -1345,6 +1355,12 @@ input::placeholder,textarea::placeholder {
 .conflicts {
   border-left-color:#f0b84b;
   background:#171717
+}
+.access-warning {
+  border-color:#f0b84b;
+  border-left-color:#f0b84b;
+  background:#171717;
+  color:#f5f5f5
 }
 .error-message {
   border-color:#6f302b;

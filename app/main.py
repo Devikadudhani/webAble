@@ -81,20 +81,39 @@ from app.capture.responsive import (
     ViewportCaptureResult,
     capture_responsive_viewports,
 )
-from app.capture.models import NavigationStatus, ReadinessStatus
+from app.capture.models import AccessStatus, NavigationStatus, ReadinessStatus
 from app.analyzers.scoring import build_audit_scoring
-from app.capture.runner import BrowserCapture, BrowserCaptureError
+from app.capture.runner import (
+    BrowserCapture,
+    BrowserCaptureError,
+    NAVIGATION_TIMEOUT_MS as DEFAULT_NAVIGATION_TIMEOUT_MS,
+    SETTLING_PERIOD_MS as DEFAULT_SETTLING_PERIOD_MS,
+    READINESS_TIMEOUT_MS,
+    NETWORK_IDLE_SIGNAL_MS,
+    LAZY_SCROLL_MAX_MS,
+)
 from app.capture.storage import LocalScreenshotStorage
 from app.capture.url_safety import PublicURLSafetyValidator, UnsafeURL
 
 OUTPUT_DIR = Path(os.getenv("WEBABLE_OUTPUT_DIR", "output"))
-NAVIGATION_TIMEOUT_MS = int(os.getenv("WEBABLE_NAVIGATION_TIMEOUT_MS", "15000"))
-SETTLING_PERIOD_MS = int(os.getenv("WEBABLE_SETTLING_PERIOD_MS", "1500"))
-CAPTURE_TIMEOUT_SECONDS = (
+def _bounded_timeout(name: str, default: int, minimum: int, maximum: int) -> int:
+    try:
+        value = int(os.getenv(name, str(default)))
+    except ValueError:
+        value = default
+    return max(minimum, min(maximum, value))
+
+
+NAVIGATION_TIMEOUT_MS = _bounded_timeout("WEBABLE_NAVIGATION_TIMEOUT_MS", DEFAULT_NAVIGATION_TIMEOUT_MS, 1_000, 60_000)
+SETTLING_PERIOD_MS = _bounded_timeout("WEBABLE_SETTLING_PERIOD_MS", DEFAULT_SETTLING_PERIOD_MS, 250, 15_000)
+_DEFAULT_CAPTURE_TIMEOUT_SECONDS = int((
     3
     * (
         NAVIGATION_TIMEOUT_MS
         + SETTLING_PERIOD_MS
+        + READINESS_TIMEOUT_MS
+        + NETWORK_IDLE_SIGNAL_MS
+        + LAZY_SCROLL_MAX_MS
         + MAX_LINK_AUDIT_DURATION_SECONDS * 1_000
         + 2 * ACCESSIBILITY_SCAN_TIMEOUT_SECONDS * 1_000
         + TARGET_SIZE_AUDIT_TIMEOUT_SECONDS * 1_000
@@ -105,6 +124,9 @@ CAPTURE_TIMEOUT_SECONDS = (
     )
     / 1_000
     + 15
+))
+CAPTURE_TIMEOUT_SECONDS = _bounded_timeout(
+    "WEBABLE_CAPTURE_TIMEOUT_SECONDS", _DEFAULT_CAPTURE_TIMEOUT_SECONDS, 60, 600
 )
 MAX_CONCURRENT_CAPTURES = max(1, int(os.getenv("WEBABLE_MAX_CONCURRENT_CAPTURES", "1")))
 MAX_PENDING_CAPTURES = max(1, int(os.getenv("WEBABLE_MAX_PENDING_CAPTURES", "20")))
@@ -467,6 +489,18 @@ class TechnicalEvidenceSchema(BaseModel):
     console_errors: list[str]
     runtime_errors: list[str]
     failed_requests: list[FailedRequestSchema]
+    redirect_chains: list[list[str]] = Field(default_factory=list)
+    unloaded_image_count: int | None = None
+    loading_indicator_count: int | None = None
+    visible_content_characters: int = 0
+    access_restriction_signals: list[str] = Field(default_factory=list)
+    access_restriction_provider: str | None = None
+    access_restriction_reference: str | None = None
+    main_document_http_status: int | None = None
+    access_status: AccessStatus = "unavailable"
+    primary_content_characters: int = 0
+    primary_content_items: int = 0
+    readiness_elapsed_ms: int = 0
     details: list[str]
 
 
@@ -654,6 +688,7 @@ class ResponsiveViewportResponse(BaseModel):
     name: str
     viewport: ViewportSchema
     capture_outcome: ViewportCaptureOutcome
+    analyzer_execution_status: Literal["completed", "partial", "not_run"] = "not_run"
     horizontal_overflow: HorizontalOverflowSchema | None
     overflow_analysis_status: OverflowAnalysisStatus
     element_overflow_diagnosis: ElementOverflowDiagnosisSchema
@@ -800,6 +835,7 @@ class ResponsiveCaptureResponse(BaseModel):
                         width=result.viewport.width, height=result.viewport.height
                     ),
                     capture_outcome=result.capture_outcome,
+                    analyzer_execution_status=result.analyzer_execution_status,
                     horizontal_overflow=(
                         HorizontalOverflowSchema(
                             scroll_width=result.horizontal_overflow.scroll_width,
@@ -1036,6 +1072,13 @@ class CaptureErrorEnvelope(BaseModel):
     },
 )
 async def create_capture(request: CaptureRequest) -> ResponsiveCaptureResponse:
+    screenshot_dir = capture_service._storage._directory
+    existing_screenshots = (
+        {path.name for path in screenshot_dir.iterdir() if path.is_file()}
+        if screenshot_dir.is_dir()
+        else set()
+    )
+    retained_screenshots: set[str] = set()
     try:
         await url_validator.validate(request.url)
 
@@ -1052,6 +1095,13 @@ async def create_capture(request: CaptureRequest) -> ResponsiveCaptureResponse:
                 ),
                 timeout=CAPTURE_TIMEOUT_SECONDS,
             )
+        response = ResponsiveCaptureResponse.from_results(
+            request.url,
+            results,
+            accessibility_context=request.accessibility_context,
+        )
+        retained_screenshots = _screenshot_references(response.model_dump(mode="json"))
+        return response
     except UnsafeURL as error:
         raise HTTPException(
             status_code=400,
@@ -1082,11 +1132,44 @@ async def create_capture(request: CaptureRequest) -> ResponsiveCaptureResponse:
                 detail="Chromium failed while preparing the capture.",
             ).model_dump(),
         ) from error
-    return ResponsiveCaptureResponse.from_results(
-        request.url,
-        results,
-        accessibility_context=request.accessibility_context,
-    )
+    finally:
+        if os.getenv("VERCEL"):
+            _cleanup_unreferenced_screenshots(
+                screenshot_dir, existing_screenshots, retained_screenshots
+            )
+
+
+def _screenshot_references(value) -> set[str]:
+    references: set[str] = set()
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if key.endswith("screenshot_ref") and isinstance(item, str):
+                references.add(Path(item).name)
+            else:
+                references.update(_screenshot_references(item))
+    elif isinstance(value, list):
+        for item in value:
+            references.update(_screenshot_references(item))
+    return references
+
+
+def _cleanup_unreferenced_screenshots(
+    directory: Path, existing: set[str], retained: set[str]
+) -> None:
+    if not directory.is_dir():
+        return
+    for path in directory.iterdir():
+        if path.is_file() and path.name not in existing and path.name not in retained:
+            try:
+                path.unlink()
+            except OSError:
+                logging.getLogger(__name__).warning(
+                    "Could not remove temporary screenshot %s", path.name
+                )
+    try:
+        directory.rmdir()
+    except OSError:
+        pass
 
 
 async def _run_capture_job(job_id: str, request: CaptureRequest) -> None:

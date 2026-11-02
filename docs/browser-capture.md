@@ -594,3 +594,38 @@ indicate owner-reported support, concern, or uncertainty for the criterion.
 This owner self-assessment does not independently verify conformance;
 assistive-technology, content, and interaction checks outside the questionnaire
 remain limitations of the self-report.
+
+## JavaScript-heavy pages and partial captures
+
+Capture readiness is based on visible content in the primary page region, content
+stability, product/list items, and loading indicators in that region. Navigation
+and readiness are bounded; readiness is polled without restarting navigation.
+The default readiness window is 30 seconds so delayed client-rendered sections
+can appear. A bounded `networkidle` wait is only a supporting signal; images,
+analytics, polling, and secondary resources do not have to finish before the
+primary content is captured. A usable page can be analyzed after the navigation
+deadline, but its viewport is marked `partial` and the report shows whether
+analyzers ran. Empty documents, browser errors, restricted responses, CAPTCHA or
+bot challenges, and skeleton-only screens are not evaluated as the target site.
+Lazy content is triggered by a bounded sequence of viewport scrolls, then the
+browser returns to the top before the baseline screenshot. Access status is
+reported as `accessible`, `partial`, `restricted`, or `unavailable`.
+
+Capture settings are bounded to avoid unbounded browser work:
+
+| Environment variable | Default | Allowed range |
+| --- | ---: | ---: |
+| `WEBABLE_NAVIGATION_TIMEOUT_MS` | 20,000 | 1,000–60,000 |
+| `WEBABLE_SETTLING_PERIOD_MS` | 4,000 | 250–15,000 |
+| `WEBABLE_READINESS_TIMEOUT_MS` | 30,000 | 500–45,000 |
+| `WEBABLE_NETWORK_IDLE_SIGNAL_MS` | 400 | 0–5,000 |
+| `WEBABLE_LAZY_SCROLL_MAX_STEPS` | 24 | 0–60 |
+| `WEBABLE_LAZY_SCROLL_STEP_WAIT_MS` | 150 | 50–500 |
+| `WEBABLE_LAZY_SCROLL_MAX_MS` | 5,000 | 0–10,000 |
+| `WEBABLE_CAPTURE_TIMEOUT_SECONDS` | calculated | 60–600 |
+
+HTTP error responses, failed requests, redirect chains, JavaScript errors, visible
+content size, loading indicators, unloaded images, and possible access-restriction
+signals are retained in technical evidence. These signals help distinguish an
+inaccessible or challenged page from a complete audit; they do not prove why a
+site restricted access.
