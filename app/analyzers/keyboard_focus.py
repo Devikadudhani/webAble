@@ -285,7 +285,7 @@ _SNAPSHOT = """(baselineStylesBySelector) => {
     );
     for (const sample of samples.slice(1)) {
       const selectors = new Set(sample.chain.map(selectorFor));
-      for (const selector of fullCoverCandidates) {
+      for (const selector of [...fullCoverCandidates.keys()]) {
         if (!selectors.has(selector)) fullCoverCandidates.delete(selector);
       }
     }
@@ -787,7 +787,13 @@ async def _audit_keyboard_focus(page: KeyboardPage) -> KeyboardFocusAuditResult:
         }
         omitted = sorted(expected - seen)
         sequence_status: KeyboardCheckStatus = "needs_review"
-        if tab_stalled_selector:
+        if not sequence:
+            sequence_status = "not_tested"
+            sequence_summary = (
+                "No focus target was successfully traversed; sequential navigation "
+                "could not be evaluated."
+            )
+        elif tab_stalled_selector:
             sequence_summary = (
                 "Tab remained on the same focus target in the sample; this may "
                 "indicate blocked keyboard operation, but does not by itself prove "
@@ -804,6 +810,7 @@ async def _audit_keyboard_focus(page: KeyboardPage) -> KeyboardFocusAuditResult:
             or initial.get("candidatesTruncated")
             or late_candidates
             or unexpected_focus_targets
+            or tab_action_limit_reached
         ):
             sequence_summary = (
                 "The observed sequence did not include every initially discovered "
@@ -811,10 +818,12 @@ async def _audit_keyboard_focus(page: KeyboardPage) -> KeyboardFocusAuditResult:
                 "contexts, dynamic changes, or custom navigation can explain differences."
             )
         else:
+            sequence_status = "pass"
             sequence_summary = (
                 "The bounded Tab/Shift+Tab sample advanced through the observed focus "
-                "targets without a detected repeat; candidate discovery and widget "
-                "operation are incomplete and require review."
+                "targets without a detected repeat. This pass applies only to the "
+                "tested sequence; widget operation and undiscovered controls were "
+                "not evaluated."
             )
         checks = [
             _check(
@@ -841,7 +850,13 @@ async def _audit_keyboard_focus(page: KeyboardPage) -> KeyboardFocusAuditResult:
             _check(
                 "keyboard_trap",
                 ["2.1.2"],
-                "needs_review" if sequence else "not_tested",
+                (
+                    "not_tested"
+                    if not sequence
+                    else "needs_review"
+                    if tab_stalled_selector or tab_cycle_selectors or reverse_stuck
+                    else "pass"
+                ),
                 (
                     "Focus remained on the same target after both Tab and Shift+Tab; "
                     "this is a possible keyboard trap and requires review of the "
@@ -866,9 +881,9 @@ async def _audit_keyboard_focus(page: KeyboardPage) -> KeyboardFocusAuditResult:
                             if tab_stalled_selector and reverse_sequence
                             else (
                                 "No same-target Tab stall or repeated focus cycle "
-                                "persisting during reverse navigation was observed; "
-                                "undiscovered controls, widgets, and states still "
-                                "require review."
+                                "persisting during reverse navigation was observed in "
+                                "the tested sequence; undiscovered controls and widget "
+                                "behavior were not evaluated."
                             )
                         )
                     )

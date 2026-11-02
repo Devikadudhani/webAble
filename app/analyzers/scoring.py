@@ -2,15 +2,20 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
+import math
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass, is_dataclass
 from typing import Any, Literal
+from urllib.parse import urlsplit
 
 from app.analyzers.accessibility import AccessibilityScanResult, AxeRuleEvidence
 from app.analyzers.keyboard_focus import KeyboardFocusAuditResult
 from app.analyzers.text_reflow import TextReflowAuditResult, TextReflowScenario
 from app.analyzers.target_size import TargetSizeAuditResult
 from app.capture.responsive import ViewportCaptureResult
+
+logger = logging.getLogger(__name__)
 
 CriterionStatus = Literal[
     "pass",
@@ -22,6 +27,7 @@ CriterionStatus = Literal[
     "error",
 ]
 Confidence = Literal["high", "medium", "low"]
+EvidenceStrength = Literal["deterministic", "bounded_probe", "heuristic"]
 ScoringStatus = Literal[
     "insufficient_evidence",
     "provisional",
@@ -31,7 +37,7 @@ ScoringStatus = Literal[
     "not_scored",
 ]
 
-SCORING_CONFIGURATION_VERSION = "1.0.0"
+SCORING_CONFIGURATION_VERSION = "1.2.0"
 VIEWPORT_ORDER = ("desktop", "tablet", "mobile")
 
 _NAME_RULES = frozenset(
@@ -71,6 +77,10 @@ class CriterionConfig:
     required_viewports: tuple[str, ...] = VIEWPORT_ORDER
     applicable_conditions: str | None = None
     default_severity_guidance: str | None = None
+    wcag_references: tuple[str, ...] = ()
+    level: str | None = None
+    principle: str | None = None
+    evidence_strength: EvidenceStrength = "bounded_probe"
 
 
 @dataclass(frozen=True)
@@ -146,6 +156,10 @@ CRITERIA = (
         5,
         "Selected axe checks for accessible names and form labels.",
         ("axe_core",),
+        wcag_references=("4.1.2",),
+        level="A",
+        principle="Robust",
+        evidence_strength="bounded_probe",
     ),
     CriterionConfig(
         "accessibility.keyboard_operability",
@@ -154,6 +168,10 @@ CRITERIA = (
         5,
         "Bounded Tab and Shift+Tab navigation observations.",
         ("keyboard_focus",),
+        wcag_references=("2.1.1", "2.1.2"),
+        level="A",
+        principle="Operable",
+        evidence_strength="bounded_probe",
     ),
     CriterionConfig(
         "accessibility.focus_visibility",
@@ -162,6 +180,10 @@ CRITERIA = (
         4,
         "Sampled focus indicators and focus obscuration checks.",
         ("keyboard_focus",),
+        wcag_references=("2.4.7", "2.4.11"),
+        level="AA",
+        principle="Operable",
+        evidence_strength="bounded_probe",
     ),
     CriterionConfig(
         "accessibility.text_resizing",
@@ -171,6 +193,10 @@ CRITERIA = (
         "Per-element computed-font-size doubling probe; not actual browser zoom.",
         ("text_reflow",),
         applicable_conditions="Requires a completed text_200_percent scenario.",
+        wcag_references=("1.4.4",),
+        level="AA",
+        principle="Perceivable",
+        evidence_strength="bounded_probe",
     ),
     CriterionConfig(
         "accessibility.color_contrast",
@@ -179,6 +205,10 @@ CRITERIA = (
         4,
         "axe color-contrast rule results; incomplete results require review.",
         ("axe_core",),
+        wcag_references=("1.4.3",),
+        level="AA",
+        principle="Perceivable",
+        evidence_strength="bounded_probe",
     ),
     CriterionConfig(
         "accessibility.target_size",
@@ -187,6 +217,10 @@ CRITERIA = (
         3,
         "Bounded measurement of undersized pointer-target candidates.",
         ("target_size",),
+        wcag_references=("2.5.8",),
+        level="AA",
+        principle="Operable",
+        evidence_strength="heuristic",
     ),
     CriterionConfig(
         "accessibility.automated_checks",
@@ -203,6 +237,10 @@ CRITERIA = (
         2,
         "Heuristic non-text contrast candidate detection; findings require review.",
         ("non_text_contrast",),
+        wcag_references=("1.4.11",),
+        level="AA",
+        principle="Perceivable",
+        evidence_strength="heuristic",
     ),
     CriterionConfig(
         "responsive.document_overflow",
@@ -211,6 +249,7 @@ CRITERIA = (
         5,
         "Document scroll width compared with viewport width.",
         ("document_overflow",),
+        evidence_strength="deterministic",
     ),
     CriterionConfig(
         "responsive.element_overflow",
@@ -219,6 +258,7 @@ CRITERIA = (
         4,
         "Bounded element geometry and layout evidence.",
         ("element_overflow",),
+        evidence_strength="heuristic",
     ),
     CriterionConfig(
         "responsive.layout_clipping",
@@ -237,6 +277,10 @@ CRITERIA = (
         "Bounded 320 CSS-pixel viewport probe.",
         ("text_reflow",),
         applicable_conditions="Requires a completed reflow_320_css_px scenario.",
+        wcag_references=("1.4.10",),
+        level="AA",
+        principle="Perceivable",
+        evidence_strength="bounded_probe",
     ),
     CriterionConfig(
         "responsive.cross_viewport_behavior",
@@ -263,6 +307,7 @@ CRITERIA = (
         4,
         "Bounded HEAD checks of up to 15 rendered links per viewport.",
         ("functional_ux",),
+        evidence_strength="bounded_probe",
     ),
     CriterionConfig(
         "functional.broken_images",
@@ -271,6 +316,7 @@ CRITERIA = (
         2,
         "Rendered image loading checks; other media and functionality are not covered.",
         ("functional_ux",),
+        evidence_strength="bounded_probe",
     ),
     CriterionConfig(
         "functional.interactive_controls",
@@ -304,8 +350,9 @@ CRITERIA = (
         "JavaScript console errors",
         "technical_reliability",
         4,
-        "Recorded console.error events from the captured browser page.",
+        "Recorded console.error events; uncaught page exceptions are evaluated separately.",
         ("browser_console",),
+        evidence_strength="deterministic",
     ),
     CriterionConfig(
         "technical.failed_requests",
@@ -314,6 +361,7 @@ CRITERIA = (
         4,
         "Recorded HTTP errors and failed requests; blocked or ambiguous failures require review.",
         ("browser_network",),
+        evidence_strength="bounded_probe",
     ),
     CriterionConfig(
         "technical.runtime_errors",
@@ -322,6 +370,7 @@ CRITERIA = (
         3,
         "Uncaught page errors recorded by the browser capture.",
         ("browser_runtime",),
+        evidence_strength="deterministic",
     ),
     CriterionConfig(
         "technical.resource_failures",
@@ -339,6 +388,7 @@ CRITERIA = (
         2,
         "Navigation, readiness, and capture completion status.",
         ("browser_capture",),
+        evidence_strength="bounded_probe",
     ),
     CriterionConfig(
         "visual.visual_consistency",
@@ -379,6 +429,7 @@ def build_audit_scoring(
         criterion.criterion_id: [] for criterion in configuration.criteria
     }
     results_by_viewport = {result.name: result for result in results}
+    criterion_diagnostics = []
 
     for viewport in VIEWPORT_ORDER:
         result = results_by_viewport.get(viewport)
@@ -442,8 +493,13 @@ def build_audit_scoring(
                 "criterion_id": criterion.criterion_id,
                 "criterion_name": criterion.name,
                 "dimension": criterion.dimension,
+                "implemented": criterion.implemented,
                 "status": status,
                 "weight": criterion.weight,
+                "evidence_strength": criterion.evidence_strength,
+                "wcag_references": list(criterion.wcag_references),
+                "level": criterion.level,
+                "principle": criterion.principle,
                 "tested_viewports": tested_viewports,
                 "affected_viewports": affected_viewports,
                 "evidence_count": len(evidence),
@@ -466,6 +522,24 @@ def build_audit_scoring(
                 "applicable_conditions": criterion.applicable_conditions,
             }
         )
+        criterion_diagnostics.append(
+            {
+                "criterion_id": criterion.criterion_id,
+                "dimension": criterion.dimension,
+                "weight": criterion.weight,
+                "observations": [
+                    {
+                        "viewport": observation.viewport,
+                        "status": observation.status,
+                        "analyzer_id": observation.analyzer_id,
+                        "details": observation.details,
+                        "confidence": observation.confidence,
+                    }
+                    for observation in criterion_observations
+                ],
+                "aggregated_status": status,
+            }
+        )
 
     dimensions = [
         _score_dimension(
@@ -475,11 +549,40 @@ def build_audit_scoring(
         )
         for dimension in configuration.dimensions
     ]
-    overall = _score_overall(dimensions, configuration)
+    if logger.isEnabledFor(logging.DEBUG):
+        logger.debug(
+            "audit_scoring_diagnostics=%s",
+            json.dumps(
+                {
+                    "criteria": criterion_diagnostics,
+                    "dimensions": [
+                        _dimension_diagnostics(dimension, criterion_results)
+                        for dimension in dimensions
+                    ],
+                },
+                sort_keys=True,
+                separators=(",", ":"),
+            ),
+        )
+    overall = _score_overall(dimensions, criterion_results, configuration)
+    status_counts = {
+        output_key: sum(item["status"] == status for item in criterion_results)
+        for output_key, status in (
+            ("passed", "pass"),
+            ("failed", "fail"),
+            ("needs_review", "needs_review"),
+            ("not_tested", "not_tested"),
+            ("unsupported", "unsupported"),
+            ("not_applicable", "not_applicable"),
+            ("error", "error"),
+        )
+    }
     return {
         **overall,
         "dimensions": dimensions,
         "criteria": criterion_results,
+        "status_counts": status_counts,
+        "viewport_coverage": _viewport_coverage(results, observations),
         "scoring_configuration_version": configuration.version,
         "limitations": [
             "Scores summarize configured criteria, not WCAG conformance or total website quality.",
@@ -568,7 +671,9 @@ def _normalize_axe(
                 details="No relevant axe rule result established this criterion.",
                 limitations=("Absence of a relevant rule result is not a pass.",),
             )
-        elif all(status == "not_applicable" for status, _ in matching):
+        elif all(status == "not_applicable" for status, _ in matching) and {
+            rule.rule_id for _, rule in matching
+        } == rule_ids:
             observation = _Observation(
                 viewport,
                 "not_applicable",
@@ -576,12 +681,12 @@ def _normalize_axe(
                 details="Relevant axe rules reported no applicable nodes.",
                 data=[_rule_data(rule) for _, rule in matching],
             )
-        elif audit.status == "partial":
+        elif {rule.rule_id for _, rule in matching} != rule_ids:
             observation = _Observation(
                 viewport,
                 "needs_review",
                 "axe_core",
-                details="The accessibility scan was partial.",
+                details="One or more relevant axe rules did not return a result.",
                 data=[_rule_data(rule) for _, rule in matching],
                 limitations=tuple(audit.details),
             )
@@ -593,6 +698,7 @@ def _normalize_axe(
                 details="Relevant axe rules completed without a reported violation.",
                 data=[_rule_data(rule) for _, rule in matching],
                 confidence="medium",
+                limitations=tuple(audit.details) if audit.status == "partial" else (),
             )
         observations[criterion_id].append(observation)
 
@@ -707,9 +813,10 @@ def _normalize_keyboard(
             status = "needs_review"
         elif all(check.status == "not_tested" for check in checks):
             status = "not_tested"
-        elif any(check.status == "not_tested" for check in checks):
-            status = "needs_review"
-        elif audit.status == "partial":
+        elif (
+            {check.check_id for check in checks} != check_ids
+            or any(check.status == "not_tested" for check in checks)
+        ):
             status = "needs_review"
         elif all(check.status == "pass" for check in checks):
             status = "pass"
@@ -773,6 +880,8 @@ def _scenario_status(scenario: TextReflowScenario | None) -> CriterionStatus:
         return "unsupported"
     if scenario.status == "not_tested" or scenario.classification == "not_tested":
         return "not_tested"
+    if scenario.status != "completed":
+        return "not_tested"
     if scenario.classification == "violation":
         return "fail"
     if scenario.classification == "needs_review" or scenario.findings:
@@ -822,9 +931,7 @@ def _normalize_overflow(
 ) -> None:
     if result.overflow_analysis_status == "available" and result.horizontal_overflow:
         overflow = result.horizontal_overflow
-        status: CriterionStatus = (
-            "needs_review" if overflow.potential_horizontal_overflow else "pass"
-        )
+        status: CriterionStatus = "fail" if overflow.overflow_px > 0 else "pass"
         data = _plain(overflow)
     elif result.overflow_analysis_status in ("capture_incomplete", "missing_dimensions"):
         status, data = "not_tested", None
@@ -837,13 +944,13 @@ def _normalize_overflow(
             viewport,
             status,
             "document_overflow",
-            details="Measured document overflow requires review."
-            if status == "needs_review"
+            details="Document width exceeded the viewport width."
+            if status == "fail"
             else "Document and viewport widths were measured."
             if status == "pass"
             else None,
             data=data,
-            confidence="medium" if status == "pass" else None,
+            confidence="high" if status in ("pass", "fail") else None,
         )
     )
 
@@ -906,12 +1013,14 @@ def _normalize_functional(
             status = "not_tested"
         elif failures:
             status = "fail"
-        elif inconclusive or audit.status == "partial":
+        elif inconclusive:
             status = "needs_review"
         elif audit.status == "available" and checked_count == 0:
             status = "not_applicable"
-        elif audit.status == "available":
+        elif audit.status in ("available", "partial") and checked_count > 0:
             status = "pass"
+        elif audit.status == "partial":
+            status = "needs_review"
         else:
             status = "not_tested"
         observations[criterion_id].append(
@@ -929,6 +1038,13 @@ def _normalize_functional(
                 data=[_plain(item) for item in (*failures, *inconclusive)],
                 confidence="high" if failures else "medium" if status == "pass" else None,
                 limitations=tuple(audit.details)
+                + (
+                    (
+                        f"{audit.excluded_non_http_links} non-HTTP link(s) were excluded from destination checks.",
+                    )
+                    if audit.excluded_non_http_links
+                    else ()
+                )
                 + tuple(
                     limitation
                     for item in (*failures, *inconclusive)
@@ -981,20 +1097,31 @@ def _normalize_technical(
                 else "Browser error evidence is incomplete.",
                 data=list(issues),
                 confidence="high" if issues else "medium" if status == "pass" else None,
-                limitations=tuple(technical.details),
+                limitations=tuple(technical.details)
+                + (
+                    (
+                        "A console.error event alone does not establish a user-facing defect; review its context. Uncaught page exceptions are tracked separately.",
+                    )
+                    if analyzer_id == "browser_console" and issues
+                    else ()
+                ),
             )
         )
 
     failed = technical.failed_requests
-    http_failures = [
-        item
-        for item in failed
-        if item.error and item.error.upper().startswith("HTTP ")
-    ]
-    ambiguous = [item for item in failed if item not in http_failures]
-    if http_failures:
+    first_party_http_failures = []
+    review_failures = []
+    for item in failed:
+        if item.error and item.error.upper().startswith("HTTP "):
+            if _same_origin(technical.page_url, item.url) is True:
+                first_party_http_failures.append(item)
+            else:
+                review_failures.append(item)
+        else:
+            review_failures.append(item)
+    if first_party_http_failures:
         network_status: CriterionStatus = "fail"
-    elif ambiguous:
+    elif review_failures:
         network_status = "needs_review"
     elif technical.status == "available":
         network_status = "pass"
@@ -1010,31 +1137,35 @@ def _normalize_technical(
             network_status,
             "browser_network",
             details=(
-                f"{len(http_failures)} HTTP error response(s) and "
-                f"{len(ambiguous)} ambiguous failed request(s) were recorded."
+                f"{len(first_party_http_failures)} first-party HTTP failure(s), "
+                f"{len(review_failures)} third-party or ambiguous request failure(s) were recorded."
                 if failed
                 else "No failed requests were recorded."
                 if network_status == "pass"
                 else "Network request evidence is incomplete."
             ),
             data=[_plain(item) for item in failed],
-            confidence="high" if http_failures else None,
+            confidence="high" if first_party_http_failures else None,
             limitations=tuple(technical.details)
             + (
-                ("Non-HTTP request failures may be environment-related or intentionally blocked.",)
-                if ambiguous
+                (
+                    "Third-party HTTP failures, non-HTTP failures, and requests whose origin could not be established require review.",
+                )
+                if review_failures
                 else ()
             ),
         )
     )
 
     capture_outcome = result.capture_outcome
-    if capture_outcome == "completed" and technical.status == "available":
-        capture_status: CriterionStatus = "pass"
+    if capture_outcome == "capture_failed":
+        capture_status: CriterionStatus = "error"
     elif capture_outcome in ("partial", "navigation_timeout"):
+        capture_status = "needs_review"
+    elif technical.status == "unavailable":
         capture_status = "error"
-    elif capture_outcome == "capture_failed":
-        capture_status = "error"
+    elif capture_outcome == "completed" and technical.status == "available":
+        capture_status = "pass"
     else:
         capture_status = "not_tested"
     observations["technical.capture_reliability"].append(
@@ -1051,6 +1182,84 @@ def _normalize_technical(
             limitations=tuple(technical.details),
         )
     )
+
+
+def _same_origin(page_url: str | None, request_url: str) -> bool | None:
+    if not page_url:
+        return None
+    try:
+        page = urlsplit(page_url)
+        request = urlsplit(request_url)
+        if page.scheme not in ("http", "https") or request.scheme not in ("http", "https"):
+            return None
+        if not page.hostname or not request.hostname:
+            return None
+        page_port = page.port or (443 if page.scheme == "https" else 80)
+        request_port = request.port or (443 if request.scheme == "https" else 80)
+    except ValueError:
+        return None
+    return (
+        page.scheme.lower(),
+        page.hostname.lower(),
+        page_port,
+    ) == (
+        request.scheme.lower(),
+        request.hostname.lower(),
+        request_port,
+    )
+
+
+def _viewport_coverage(
+    results: list[ViewportCaptureResult],
+    observations: dict[str, list[_Observation]],
+) -> dict[str, dict[str, Any]]:
+    results_by_name = {result.name: result for result in results}
+    coverage = {}
+    for viewport in VIEWPORT_ORDER:
+        result = results_by_name.get(viewport)
+        if result is None:
+            coverage[viewport] = {
+                "name": viewport,
+                "capture_outcome": "not_returned",
+                "capture_completed": False,
+                "analyzer_evidence_returned": False,
+                "limitations": ["No capture result was returned for this viewport."],
+            }
+            continue
+        viewport_observations = [
+            observation
+            for criterion_observations in observations.values()
+            for observation in criterion_observations
+            if observation.viewport == viewport
+        ]
+        analyzer_evidence_returned = any(
+            item.status not in ("not_tested", "unsupported")
+            for item in viewport_observations
+        )
+        limitations = _ordered_unique(
+            [
+                *result.details,
+                *result.technical_evidence.details,
+                *(
+                    limitation
+                    for observation in viewport_observations
+                    for limitation in observation.limitations
+                ),
+            ]
+        )
+        if result.capture_outcome != "completed":
+            limitations.append(
+                f"Capture outcome was {result.capture_outcome}; viewport evidence may be incomplete."
+            )
+            limitations = _ordered_unique(limitations)
+        coverage[viewport] = {
+            "name": viewport,
+            "capture_outcome": result.capture_outcome,
+            "capture_completed": result.capture_outcome == "completed",
+            "analyzer_evidence_returned": analyzer_evidence_returned,
+            "limitations": limitations,
+        }
+    return coverage
 
 
 def _score_dimension(
@@ -1076,6 +1285,23 @@ def _score_dimension(
     coverage = round(conclusive / applicable * 100, 2) if applicable else None
     score_denominator = sum(
         item["weight"] for item in selected if item["status"] in ("pass", "fail")
+    )
+    range_denominator = sum(
+        item["weight"]
+        for item in selected
+        if dimension.implemented
+        and item["implemented"]
+        and item["status"]
+        in ("pass", "fail", "needs_review", "not_tested", "error")
+    )
+    passed_weight = sum(
+        item["weight"] for item in selected if item["status"] == "pass"
+    )
+    unresolved_weight = sum(
+        item["weight"]
+        for item in selected
+        if item["implemented"]
+        and item["status"] in ("needs_review", "not_tested", "error")
     )
     raw_score = (
         round(
@@ -1108,6 +1334,17 @@ def _score_dimension(
         "weight": dimension.weight,
         "implemented": dimension.implemented,
         "score": score,
+        "score_basis": "conclusive_checks" if score is not None else None,
+        "score_range": {
+            "min": round(passed_weight / range_denominator * 100, 2)
+            if range_denominator
+            else None,
+            "max": round(
+                (passed_weight + unresolved_weight) / range_denominator * 100, 2
+            )
+            if range_denominator
+            else None,
+        },
         "coverage_percentage": coverage,
         "total_applicable_criteria": applicable,
         "conclusive_criteria": conclusive,
@@ -1135,6 +1372,7 @@ def _score_dimension(
 
 def _score_overall(
     dimensions: list[dict[str, Any]],
+    criteria: list[dict[str, Any]],
     configuration: ScoringConfiguration,
 ) -> dict[str, Any]:
     implemented = [item for item in dimensions if item["implemented"]]
@@ -1163,22 +1401,26 @@ def _score_overall(
         and item["coverage_percentage"] is not None
         and item["coverage_percentage"] >= configuration.minimum_overall_coverage
     ]
+    included_ids = {item["dimension_id"] for item in included}
     excluded = [
         {
             "dimension_id": item["dimension_id"],
             "reason": (
                 "Dimension is not implemented."
                 if not item["implemented"]
+                else "Dimension has no applicable criteria."
+                if item["coverage_percentage"] is None
                 else "Dimension has no conclusive evidence."
+                if item["conclusive_criteria"] == 0
+                else "Dimension evidence is below the configured score-validity threshold."
                 if item["score"] is None
                 else "Dimension coverage is below the configured overall threshold."
-                if item["coverage_percentage"] is None
-                or item["coverage_percentage"] < configuration.minimum_overall_coverage
+                if item["coverage_percentage"] < configuration.minimum_overall_coverage
                 else "Dimension was excluded by configuration."
             ),
         }
         for item in dimensions
-        if item not in included
+        if item["dimension_id"] not in included_ids
     ]
     denominator = sum(item["weight"] for item in included)
     candidate_score = (
@@ -1205,16 +1447,21 @@ def _score_overall(
     overall_scoring_status = (
         "insufficient_evidence"
         if overall_score is None
-        else "valid_high_coverage"
-        if overall_coverage is not None and overall_coverage >= 90
-        else "valid_moderate_coverage"
-        if overall_coverage is not None and overall_coverage >= 70
-        else "provisional"
+        else _threshold_label(
+            overall_coverage,
+            tuple(
+                (threshold, status)
+                for threshold, status in configuration.score_validity_thresholds
+            ),
+        )
     )
-    return {
+    implemented_weight = sum(item["weight"] for item in implemented)
+    included_weight = sum(item["weight"] for item in included)
+    output = {
         "overall_score": overall_score,
         "overall_score_type": overall_score_type,
         "overall_coverage": overall_coverage,
+        "minimum_overall_coverage": configuration.minimum_overall_coverage,
         "overall_scoring_status": overall_scoring_status,
         "included_dimensions": [item["dimension_id"] for item in included]
         if overall_score is not None
@@ -1225,7 +1472,118 @@ def _score_overall(
             if overall_score is not None
             else None
         ),
+        "score_weight_basis": {
+            "implemented_weight": implemented_weight,
+            "included_weight": included_weight,
+            "percentage": round(included_weight / implemented_weight * 100, 2)
+            if implemented_weight
+            else None,
+        },
     }
+    if overall_score is None:
+        output["score_unavailable"] = _score_unavailable(
+            dimensions, criteria, included, output, configuration
+        )
+    return output
+
+
+def _dimension_diagnostics(
+    dimension: dict[str, Any],
+    criteria: list[dict[str, Any]],
+) -> dict[str, Any]:
+    selected = [
+        item
+        for item in criteria
+        if item["dimension"] == dimension["dimension_id"]
+    ]
+    applicable = [
+        item
+        for item in selected
+        if item["implemented"]
+        and item["status"]
+        in ("pass", "fail", "needs_review", "not_tested", "error")
+    ]
+    conclusive = [
+        item for item in applicable if item["status"] in ("pass", "fail")
+    ]
+    conclusive_weight = sum(item["weight"] for item in conclusive)
+    passed_weight = sum(
+        item["weight"] for item in conclusive if item["status"] == "pass"
+    )
+    return {
+        "dimension_id": dimension["dimension_id"],
+        "applicable_weight": sum(item["weight"] for item in applicable),
+        "conclusive_weight": conclusive_weight,
+        "passed_weight": passed_weight,
+        "failed_weight": sum(
+            item["weight"] for item in conclusive if item["status"] == "fail"
+        ),
+        "coverage": dimension["coverage_percentage"],
+        "raw_score": (
+            round(passed_weight / conclusive_weight * 100, 2)
+            if conclusive_weight
+            else None
+        ),
+        "scoring_status": dimension["scoring_status"],
+    }
+
+
+def _score_unavailable(
+    dimensions: list[dict[str, Any]],
+    criteria: list[dict[str, Any]],
+    included: list[dict[str, Any]],
+    overall: dict[str, Any],
+    configuration: ScoringConfiguration,
+) -> dict[str, Any]:
+    threshold = configuration.minimum_overall_coverage
+    reasons = []
+    if overall["overall_coverage"] is None:
+        reasons.append("Overall coverage could not be calculated from available evidence.")
+    elif overall["overall_coverage"] < threshold:
+        reasons.append(
+            f"Overall coverage is below the configured {threshold:g}% minimum."
+        )
+    if not included:
+        reasons.append("No dimension currently meets the inclusion requirements.")
+    dimension_details = []
+    for dimension in dimensions:
+        if not dimension["implemented"]:
+            continue
+        applicable_count = dimension["total_applicable_criteria"]
+        conclusive_count = dimension["conclusive_criteria"]
+        required_count = math.ceil(threshold / 100 * applicable_count)
+        unresolved = [
+            {
+                "criterion_id": criterion["criterion_id"],
+                "name": criterion["criterion_name"],
+                "status": criterion["status"],
+                "action": {
+                    "needs_review": "Existing evidence needs manual review.",
+                    "not_tested": "Run the missing check.",
+                    "error": "Resolve the analyzer or capture error.",
+                }[criterion["status"]],
+            }
+            for criterion in criteria
+            if criterion["dimension"] == dimension["dimension_id"]
+            and criterion["status"] in ("needs_review", "not_tested", "error")
+        ]
+        dimension_details.append(
+            {
+                "dimension_id": dimension["dimension_id"],
+                "name": dimension["name"],
+                "coverage_percentage": dimension["coverage_percentage"],
+                "conclusive_criteria": conclusive_count,
+                "required_conclusive_criteria": required_count,
+                "additional_conclusive_criteria_needed": max(
+                    0, required_count - conclusive_count
+                ),
+                "unresolved_criteria": unresolved,
+            }
+        )
+    reasons.append(
+        "Resolving the listed evidence gaps does not guarantee that an overall score will be available."
+    )
+    return {"reason": " ".join(reasons), "dimensions": dimension_details}
 
 
 def _dimension_status(
@@ -1298,6 +1656,7 @@ def _viewport_results(
                 "analyzer_id": observation.analyzer_id,
                 "reference": observation.reference,
                 "details": observation.details,
+                "confidence": observation.confidence,
                 "limitations": list(observation.limitations),
             }
         )
@@ -1339,8 +1698,13 @@ def _merge_evidence(
                     "details": observation.details,
                     "data": normalized_value,
                     "confidence": observation.confidence,
+                    "limitations": list(observation.limitations),
                 }
                 merged[digest] = current
+            else:
+                current["limitations"] = _ordered_unique(
+                    [*current["limitations"], *observation.limitations]
+                )
             if observation.viewport not in current["viewports"]:
                 current["viewports"].append(observation.viewport)
     return sorted(
@@ -1364,12 +1728,12 @@ def _evidence_reference(observation: _Observation, value: Any) -> str | None:
     if observation.reference:
         return observation.reference
     if isinstance(value, dict):
+        if value.get("rule_id") is not None and value.get("target") is not None:
+            return f"{value['rule_id']}:{json.dumps(value['target'], sort_keys=True)}"
         for key in ("selector", "rule_id", "finding_id", "destination_url"):
             candidate = value.get(key)
             if candidate:
                 return str(candidate)
-        if value.get("rule_id") and value.get("target"):
-            return f"{value['rule_id']}:{json.dumps(value['target'], sort_keys=True)}"
     return observation.analyzer_id if value is None else None
 
 
@@ -1378,7 +1742,7 @@ def _rule_data(rule: AxeRuleEvidence) -> dict[str, Any]:
 
 
 def _plain(value: Any) -> Any:
-    if is_dataclass(value):
+    if is_dataclass(value) and not isinstance(value, type):
         return _plain(asdict(value))
     if isinstance(value, dict):
         return {str(key): _plain(item) for key, item in value.items()}

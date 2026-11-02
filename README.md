@@ -73,6 +73,19 @@ Restarts discard jobs. Use a persistent shared job queue and result store before
 enabling multiple workers, replicas, or serverless hosting. This implementation
 is intended for the Docker/Render service above.
 
+The dashboard opens a dedicated `/scan/{scan-id}` page after queueing an audit.
+Its progress bar is a time-based estimate, not live server telemetry, and stays
+below 100% until the API returns a completed report. Refreshing the same browser
+tab resumes polling from session storage. Completed reports are available at
+`/report/{scan-id}` and can be restored after refresh in that tab. A server
+restart, expired in-memory job, or unavailable browser storage requires a new
+scan.
+
+The overall score is shown only when conclusive evidence reaches the
+configured minimum coverage (currently 40%). Lower coverage displays a reason
+instead of converting unavailable evidence into a zero score. Neither score
+nor coverage represents WCAG conformance.
+
 ## Verify
 
 ```sh

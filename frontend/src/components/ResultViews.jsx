@@ -2,11 +2,34 @@ import React, { useState } from "react";
 import { EvidenceDistribution, ViewportChart } from "./Visualizations";
 import { Badge, Evidence, Filter, Paginated, SafeLink } from "./Common";
 import { list, readable } from "../utils";
-export function CriterionCard({ criterion: c }) {
+function evidenceStrengthDescription(strength, status) {
+  if (strength === "bounded_probe" && status === "pass")
+    return "No issues detected in bounded probe; this does not establish complete behavior.";
+  if (strength === "deterministic" && status === "pass")
+    return "No issue was recorded by this deterministic check.";
+  if (strength === "heuristic")
+    return "Candidate detection requiring interpretation or human review.";
+  if (strength === "bounded_probe")
+    return "Limited automated probe; it does not establish complete behavior.";
+  return "Direct, reproducible measurement or observation.";
+}
+
+export function CriterionCard({ criterion: c, scoringCriteria = [] }) {
   return (
     <article className="finding">
       <details className="criterion-disclosure"><summary className="criterion-table-row"><code>{c.criterion_id}</code><strong>{c.title || c.name || "WCAG criterion"}</strong><span>{c.level || "—"}</span><Badge value={c.status} /></summary>
       <p>Manual review: {c.manual_review_required == null ? "Unavailable" : c.manual_review_required ? "Required" : "Not required by this evaluation"}</p>
+      {scoringCriteria.length > 0 && (
+        <section className="related-scoring-evidence">
+          <strong>Related scored checks</strong>
+          {scoringCriteria.map((item) => (
+            <p key={item.criterion_id}>
+              {item.criterion_name} · {readable(item.evidence_strength)}:{" "}
+              {evidenceStrengthDescription(item.evidence_strength, item.status)}
+            </p>
+          ))}
+        </section>
+      )}
       <Evidence title="Criterion intent and evidence" data={c} />
       <SafeLink url={c.criterion_url}>Criterion</SafeLink>
       <SafeLink url={c.understanding_url}>Understanding WCAG</SafeLink>
@@ -14,7 +37,7 @@ export function CriterionCard({ criterion: c }) {
     </article>
   );
 }
-export function WCAGView({ evaluation }) {
+export function WCAGView({ evaluation, scoring }) {
   const [filter, setFilter] = useState("all");
   const criteria = list(evaluation.criteria).filter(
     (c) =>
@@ -27,6 +50,15 @@ export function WCAGView({ evaluation }) {
             ? list(c.owner_reported).length
             : c.status === filter),
   );
+  const principles = ["Perceivable", "Operable", "Understandable", "Robust"];
+  const grouped = principles.map((principle) => [
+    principle,
+    criteria.filter((criterion) => criterion.principle === principle),
+  ]);
+  const uncategorized = criteria.filter(
+    (criterion) => !principles.includes(criterion.principle),
+  );
+  if (uncategorized.length) grouped.push(["Other", uncategorized]);
   return (
     <>
       <h3>WCAG 2.2 evidence</h3>
@@ -49,14 +81,79 @@ export function WCAGView({ evaluation }) {
           ].map((x) => [x, readable(x)])}
         />
       </div>
-      <div className="criterion-table-row table-heading" aria-hidden="true"><span>Criterion</span><span>Name</span><span>Level</span><span>Evidence</span></div>
       <div id="wcag-list">
-        <Paginated
-          key={filter}
-          items={criteria}
-          render={(c) => <CriterionCard criterion={c} />}
-        />
+        {grouped.map(([principle, items]) => items.length > 0 && (
+          <section className="principle-group" key={principle}>
+            <h4>{principle}</h4>
+            <div className="criterion-table-row table-heading" aria-hidden="true"><span>Criterion</span><span>Name</span><span>Level</span><span>Evidence</span></div>
+            <Paginated
+              key={`${filter}:${principle}`}
+              items={items}
+              render={(c) => (
+                <CriterionCard
+                  criterion={c}
+                  scoringCriteria={list(scoring?.criteria).filter((item) =>
+                    list(item.wcag_references).includes(c.criterion_id),
+                  )}
+                />
+              )}
+            />
+          </section>
+        ))}
+        {!criteria.length && <p className="empty-state">No criteria match this filter.</p>}
       </div>
+    </>
+  );
+}
+
+export function ScoringDimensionView({ scoring, dimensionId }) {
+  const dimensions = list(scoring.dimensions);
+  const dimension = dimensions.find((item) => item.dimension_id === dimensionId);
+  const criteria = list(scoring.criteria).filter((item) => item.dimension === dimensionId);
+  return (
+    <>
+      <h3>{dimension?.name || readable(dimensionId)}</h3>
+      {dimension?.description && <p>{dimension.description}</p>}
+      {criteria.length ? (
+        <div className="dimension-grid">
+          <Paginated
+            items={criteria}
+            render={(criterion) => (
+              <article className="panel">
+                <h4>{criterion.criterion_name}</h4>
+                <Badge value={criterion.status} />
+                <p className="field-help">
+                  Evidence strength · {readable(criterion.evidence_strength)} ·{" "}
+                  {evidenceStrengthDescription(criterion.evidence_strength, criterion.status)}
+                </p>
+                {list(criterion.wcag_references).length > 0 && (
+                  <p className="field-help">
+                    WCAG {criterion.level} · {criterion.principle} ·{" "}
+                    {list(criterion.wcag_references).join(", ")}
+                  </p>
+                )}
+                <p>{criterion.description}</p>
+                {list(criterion.viewport_results).length > 0 && (
+                  <ul className="criterion-summary-list">
+                    {criterion.viewport_results.map((result) => (
+                      <li key={result.viewport}>
+                        <strong>{readable(result.viewport)}</strong> · {readable(result.status)}
+                        {result.details ? ` — ${result.details}` : ""}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {list(criterion.limitations).length > 0 && (
+                  <p className="field-help">Limitations: {list(criterion.limitations).join(" ")}</p>
+                )}
+                <Evidence title="Supporting evidence" data={criterion.evidence} />
+              </article>
+            )}
+          />
+        </div>
+      ) : (
+        <p className="empty-state">No {readable(dimensionId)} evidence was returned.</p>
+      )}
     </>
   );
 }

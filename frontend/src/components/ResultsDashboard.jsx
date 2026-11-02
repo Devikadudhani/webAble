@@ -1,14 +1,22 @@
 import React, { useEffect, useRef, useState } from "react";
 import Overview, { SummaryCards } from "./Overview";
 import Issues from "./Issues";
-import { WCAGView, ResponsiveView, OwnerEvidence } from "./ResultViews";
+import {
+  WCAGView,
+  ResponsiveView,
+  OwnerEvidence,
+  ScoringDimensionView,
+} from "./ResultViews";
 import { Badge, Evidence, Paginated } from "./Common";
 import { limitations, list } from "../utils";
+import VisualEvidence from "./VisualEvidence";
 const tabs = [
   ["overview", "Overview"],
   ["issues", "Issues"],
   ["wcag", "WCAG"],
   ["responsive", "Responsive"],
+  ["functional", "Functional"],
+  ["technical", "Technical"],
   ["owner", "Owner Evidence"],
 ];
 export function ResultsTabs({ active, setActive }) {
@@ -98,15 +106,29 @@ export function ResultsHeader({ response, onAgain, onNew, titleRef }) {
 }
 export default function ResultsDashboard({
   response,
+  visualBaseline,
+  currentScanId,
+  baselinePersisted,
   catalog,
   onAgain,
   onNew,
 }) {
   const [active, setActive] = useState("overview"),
+    [evidenceRequest, setEvidenceRequest] = useState(null),
     title = useRef(null);
   const scoring = response.scoring || {},
     evaluation = response.hybrid_evaluation || {},
     viewports = list(response.viewports);
+  function showScreenshot(name, bounds, label) {
+    setEvidenceRequest({
+      name,
+      bounds: bounds || null,
+      label: label || "",
+      key: `${Date.now()}-${Math.random()}`,
+    });
+    const section = document.getElementById("baseline-website");
+    section?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
   useEffect(() => {
     title.current?.focus({ preventScroll: true });
     title.current?.scrollIntoView({ block: "start" });
@@ -130,6 +152,14 @@ export default function ResultsDashboard({
           <Evidence title="Conflict evidence" data={evaluation.conflicts} />
         </aside>
       )}
+      <VisualEvidence
+        baseline={visualBaseline}
+        response={response}
+        scanId={currentScanId}
+        persisted={baselinePersisted}
+        evidenceRequest={evidenceRequest}
+        onEvidenceRequest={showScreenshot}
+      />
       <ResultsTabs active={active} setActive={setActive} />
       {tabs.map(([id]) => (
         <section
@@ -149,11 +179,23 @@ export default function ResultsDashboard({
               catalog={catalog}
             />
           ) : id === "issues" ? (
-            <Issues viewports={viewports} />
+            <Issues
+              viewports={viewports}
+              baseline={visualBaseline}
+              isFollowUp={Boolean(
+                visualBaseline?.scan_id &&
+                  currentScanId !== visualBaseline.scan_id,
+              )}
+              onShowScreenshot={showScreenshot}
+            />
           ) : id === "wcag" ? (
-            <WCAGView evaluation={evaluation} />
+            <WCAGView evaluation={evaluation} scoring={scoring} />
           ) : id === "responsive" ? (
             <ResponsiveView viewports={viewports} />
+          ) : id === "functional" ? (
+            <ScoringDimensionView scoring={scoring} dimensionId="functional_reliability" />
+          ) : id === "technical" ? (
+            <ScoringDimensionView scoring={scoring} dimensionId="technical_reliability" />
           ) : (
             <OwnerEvidence evaluation={evaluation} />
           )}
@@ -165,6 +207,13 @@ export default function ResultsDashboard({
           items={limitations(response)}
           render={(text) => <p>{String(text)}</p>}
         />
+      </details>
+      <details className="panel raw-evidence">
+        <summary>Raw audit response · advanced evidence</summary>
+        <p className="field-help">
+          Includes the returned scanner evidence and diagnostic details. Review
+        </p>
+        <Evidence title="Full response" data={response} />
       </details>
     </section>
   );

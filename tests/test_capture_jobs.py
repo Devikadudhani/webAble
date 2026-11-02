@@ -25,6 +25,31 @@ def test_job_api_returns_before_audit_finishes(monkeypatch):
         assert client.post("/captures/jobs", json={}).status_code == 422
 
 
+def test_screenshot_endpoint_serves_only_saved_png_files(tmp_path, monkeypatch):
+    screenshot_dir = tmp_path / "screenshots"
+    screenshot_dir.mkdir()
+    filename = "a" * 32 + ".png"
+    image = b"\x89PNG\r\n\x1a\nbaseline"
+    (screenshot_dir / filename).write_bytes(image)
+    monkeypatch.setattr(main, "OUTPUT_DIR", tmp_path)
+
+    with TestClient(main.app) as client:
+        response = client.get(f"/captures/screenshots/{filename}")
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "image/png"
+        assert response.content == image
+        assert client.get("/captures/screenshots/not-a-screenshot.png").status_code == 404
+        assert client.get(f"/captures/screenshots/{'b' * 32}.png").status_code == 404
+
+
+def test_scan_and_report_routes_serve_the_spa_entrypoint():
+    with TestClient(main.app) as client:
+        for path in ("/scan/job-id", "/report/scan-id"):
+            response = client.get(path)
+            assert response.status_code == 200
+            assert 'id="root"' in response.text
+
+
 def test_two_users_queue_without_spending_execution_timeout(monkeypatch):
     async def run():
         monkeypatch.setattr(main, "capture_jobs", {})

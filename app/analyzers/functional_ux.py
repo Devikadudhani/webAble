@@ -58,6 +58,7 @@ class FunctionalUXAuditResult:
     inconclusive: list[FunctionalUXFinding] = field(default_factory=list)
     checked_links: int = 0
     checked_images: int = 0
+    excluded_non_http_links: int = 0
     details: list[str] = field(default_factory=list)
 
 
@@ -195,6 +196,13 @@ async def audit_functional_ux(
         )
 
     links = rendered.get("links", [])
+    checked_link_candidates = []
+    excluded_non_http_links = 0
+    for link in links:
+        if _request_url(link.get("href", "")) is None:
+            excluded_non_http_links += 1
+        else:
+            checked_link_candidates.append(link)
     check_by_url: dict[str, LinkCheckResult] = {}
     if destination_validator is not None:
         semaphore = asyncio.Semaphore(MAX_CONCURRENT_LINK_CHECKS)
@@ -226,7 +234,7 @@ async def audit_functional_ux(
         unique_urls = list(
             dict.fromkeys(
                 url
-                for link in links
+                for link in checked_link_candidates
                 if (url := _request_url(link.get("href", ""))) is not None
             )
         )
@@ -238,17 +246,12 @@ async def audit_functional_ux(
     findings: list[FunctionalUXFinding] = []
     inconclusive: list[FunctionalUXFinding] = []
     checked_links = 0
-    for link in links:
+    for link in checked_link_candidates:
         href = link.get("href", "")
         request_url = _request_url(href)
-        if not request_url:
-            result = LinkCheckResult(
-                status="inconclusive",
-                category="inconclusive",
-                evidence=["The link does not have an HTTP or HTTPS destination."],
-                limitations=["Non-web link schemes were not requested."],
-            )
-        elif destination_validator is None:
+        if request_url is None:
+            continue
+        if destination_validator is None:
             result = LinkCheckResult(
                 status="untested",
                 category="inconclusive",
@@ -282,6 +285,7 @@ async def audit_functional_ux(
         inconclusive=inconclusive,
         checked_links=checked_links,
         checked_images=checked_images,
+        excluded_non_http_links=excluded_non_http_links,
         details=details,
     )
 

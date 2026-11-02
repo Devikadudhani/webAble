@@ -17,6 +17,17 @@ discard a successful capture or screenshot.
 The service reuses one Chromium process between captures; every viewport still
 gets a fresh browser context that is closed after its evidence is collected.
 The shared browser is closed during application shutdown.
+
+Each successful viewport's `screenshot_ref` points to the exact Playwright PNG
+captured before analysis mutations. The report serves these files through
+`GET /captures/screenshots/{filename}` and the frontend saves the first scan's
+viewport references as the browser-side baseline for that URL. Later scans can
+show before/after or side-by-side captures and compare supported finding
+signatures. Screenshot files are not overwritten by later scans. The default
+`output` directory is local/ephemeral storage: on Render, add a persistent disk
+and set `WEBABLE_OUTPUT_DIR` to its mount path if screenshots must survive
+service replacement or deployment. Browser storage retains references, not image
+bytes, and does not replace a persistent server-side disk.
 Each raw element candidate also carries bounded layout evidence when available:
 its scroll/client widths, bounding geometry, computed sizing and positioning
 styles, up to five ancestors, and up to eight oversized descendants from a bounded
@@ -531,23 +542,48 @@ do not cancel owner-reported concerns or create a reverse conflict, because a
 pass or incomplete outcome covers only the bounded rule/check performed.
 
 The capture response also exposes a top-level `scoring` summary. Its versioned
-registry is centralized in `app/analyzers/scoring.py`; each criterion includes
-its normalized status, configured weight, viewport results, evidence references,
-confidence, and limitations. Evidence from multiple viewports is aggregated at
-the criterion level while retaining viewport-specific results. `fail` takes
+registry is centralized in `app/analyzers/scoring.py`; version `1.2.0` includes
+criterion status, configured weight, evidence strength, WCAG references where
+direct mappings are defensible, per-viewport results, evidence references,
+confidence, and limitations. Status counts count each criterion once.
+`viewport_coverage` identifies missing or incomplete desktop, tablet, and
+mobile captures. Evidence from multiple viewports is aggregated at the
+criterion level while retaining viewport-specific results. `fail` takes
 precedence over other viewport outcomes; missing or inconclusive evidence is
-never treated as a pass; observed console errors require review rather than being
-treated as definitive failures. Unsupported capabilities (including forms,
-executed journeys, and visual/UX quality) are identified but excluded from scoring.
+never treated as a pass. First-party HTTP failures are failures; third-party,
+non-HTTP, or origin-ambiguous request failures require review. Unsupported
+capabilities (including forms, executed journeys, and visual/UX quality) are
+identified but excluded from scoring.
+
+Analyzer-level partial status does not automatically make every criterion
+inconclusive. Functional link and image checks are normalized independently:
+completed non-empty samples with no observed failures can pass as bounded
+probes, while zero checked elements are not a pass and inconclusive results
+remain review-only. Non-HTTP links are excluded from destination checks. Axe
+rule results can remain conclusive when unrelated results or node evidence were
+truncated; a criterion does not pass if a relevant rule is missing or
+incomplete. Keyboard navigation passes apply only to the tested bounded
+sequence. Text-reflow no-violation results describe the inspected sample, not
+every page element; zero inspected text elements and truncated finding output
+are reported separately. A measured zero document overflow is conclusive;
+element-level geometry candidates remain review-only.
 
 Dimension scores use only conclusive `pass`/`fail` criteria, and are withheld
-when their evidence coverage is below 40%. The weighted overall score is
-reported as `partial_audit_score`, since visual/UX quality is not implemented;
-it is withheld when overall coverage is below 40%. The score and coverage labels
-are summaries of the configured checks, not WCAG conformance, a severity ranking,
-or a measure of total website quality. Existing per-viewport analyzer results
-remain in the response as the source evidence, and `scoring.limitations`
-describes the bounds of interpretation.
+when their evidence coverage is below the configured threshold. Their possible
+score ranges include unresolved criteria as possible outcomes; these ranges are
+not statistical confidence intervals. A dimension score is explicitly labeled
+as a score on conclusive checks and is accompanied by its evidence coverage,
+possible outcome range, and scoring status. The weighted overall score is reported
+as `partial_audit_score` while visual/UX quality is unsupported. It is withheld
+when overall coverage is below the configured minimum; `score_unavailable`
+describes current evidence gaps without promising that resolving them will
+produce a score. `score_weight_basis` reports what fraction of implemented audit
+weight contributes to the score. Scores from different
+`scoring_configuration_version` values must not be joined into a score trend.
+The score and coverage labels are summaries of configured checks, not WCAG
+conformance, a severity ranking, or a measure of total website quality.
+Existing per-viewport analyzer results remain in the response as the source
+evidence, and `scoring.limitations` describes the bounds of interpretation.
 
 The capture API is currently stateless: questionnaire answers are scoped to the
 request/response and are not durably stored across audits. Deployments should add

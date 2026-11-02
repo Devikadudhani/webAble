@@ -1,5 +1,6 @@
 import asyncio
 import os
+import re
 import sys
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -11,6 +12,7 @@ from pathlib import Path
 from typing import Literal
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from playwright.async_api import Error as PlaywrightError
@@ -268,6 +270,7 @@ class FunctionalUXAuditSchema(BaseModel):
     inconclusive: list[FunctionalUXFindingSchema]
     checked_links: int
     checked_images: int
+    excluded_non_http_links: int
     details: list[str]
 
 
@@ -388,6 +391,9 @@ class TextReflowMeasurementSchema(BaseModel):
     document_horizontal_overflow_px: int
     overflow_boundaries: list[dict]
     inspected_text_elements: int
+    discovered_text_elements: int
+    max_inspected_elements: int
+    candidates_truncated: bool
 
 
 class TextReflowFindingSchema(BaseModel):
@@ -416,6 +422,7 @@ class TextReflowScenarioSchema(BaseModel):
     measurement: TextReflowMeasurementSchema | None
     baseline_measurement: TextReflowMeasurementSchema | None
     findings: list[TextReflowFindingSchema]
+    findings_truncated: bool
     screenshot_ref: str | None
     details: list[str]
 
@@ -454,6 +461,7 @@ class FailedRequestSchema(BaseModel):
 
 class TechnicalEvidenceSchema(BaseModel):
     status: Literal["available", "partial", "unavailable", "not_tested"]
+    page_url: str | None = None
     navigation_status: NavigationStatus | None
     readiness_status: ReadinessStatus | None
     console_errors: list[str]
@@ -482,6 +490,8 @@ class ScoringDimensionSchema(BaseModel):
     weight: float
     implemented: bool
     score: float | None
+    score_basis: Literal["conclusive_checks"] | None
+    score_range: dict[str, float | None]
     coverage_percentage: float | None
     total_applicable_criteria: int
     conclusive_criteria: int
@@ -507,6 +517,7 @@ class ScoringCriterionEvidenceSchema(BaseModel):
     details: str | None
     data: dict | list | str | int | float | bool | None
     confidence: str | None
+    limitations: list[str] = Field(default_factory=list)
 
 
 class ScoringViewportResultSchema(BaseModel):
@@ -515,6 +526,7 @@ class ScoringViewportResultSchema(BaseModel):
     analyzer_id: str | None = None
     reference: str | None = None
     details: str | None = None
+    confidence: str | None = None
     limitations: list[str] = Field(default_factory=list)
 
 
@@ -523,7 +535,12 @@ class ScoringCriterionSchema(BaseModel):
     criterion_name: str
     dimension: str
     status: str
+    implemented: bool
     weight: float
+    evidence_strength: Literal["deterministic", "bounded_probe", "heuristic"]
+    wcag_references: list[str]
+    level: str | None
+    principle: str | None
     tested_viewports: list[str]
     affected_viewports: list[str]
     evidence_count: int
@@ -547,6 +564,11 @@ class AuditScoringSchema(BaseModel):
     overall_score: float | None
     overall_score_type: Literal["full_audit_score", "partial_audit_score"]
     overall_coverage: float | None
+    minimum_overall_coverage: float
+    score_weight_basis: dict[str, float | None]
+    score_unavailable: dict | None = None
+    status_counts: dict[str, int]
+    viewport_coverage: dict[str, dict]
     overall_scoring_status: str
     included_dimensions: list[str]
     excluded_dimensions: list[ExcludedDimensionSchema]
@@ -808,6 +830,9 @@ class ResponsiveCaptureResponse(BaseModel):
                         ],
                         checked_links=result.functional_ux_audit.checked_links,
                         checked_images=result.functional_ux_audit.checked_images,
+                        excluded_non_http_links=(
+                            result.functional_ux_audit.excluded_non_http_links
+                        ),
                         details=result.functional_ux_audit.details,
                     ),
                     accessibility_scan=AccessibilityScanSchema(
@@ -1107,6 +1132,20 @@ async def get_capture_job(job_id: str) -> dict:
     return {key: value for key, value in job.items() if key != "finished_at"}
 
 
+@app.get("/captures/screenshots/{filename}")
+async def get_capture_screenshot(filename: str) -> FileResponse:
+    if not re.fullmatch(
+        r"(?:[a-f0-9]{32}|scenario_[A-Za-z0-9_-]+_[A-Za-z0-9_-]+_"
+        r"[A-Za-z0-9_-]+_[0-9]+x[0-9]+)\.png",
+        filename,
+    ):
+        raise HTTPException(status_code=404, detail="Screenshot not found.")
+    screenshot_path = OUTPUT_DIR / "screenshots" / filename
+    if not screenshot_path.is_file():
+        raise HTTPException(status_code=404, detail="Screenshot not found.")
+    return FileResponse(screenshot_path, media_type="image/png")
+
+
 @app.get("/accessibility/questionnaire")
 async def get_accessibility_questionnaire() -> dict:
     return {
@@ -1155,6 +1194,16 @@ async def get_accessibility_questionnaire() -> dict:
 @app.get("/health")
 async def health() -> dict:
     return {"status": "ok"}
+
+
+@app.get("/scan/{job_id}", include_in_schema=False)
+async def scan_page(job_id: str) -> FileResponse:
+    return FileResponse(Path(__file__).resolve().parent / "static" / "index.html")
+
+
+@app.get("/report/{scan_id}", include_in_schema=False)
+async def report_page(scan_id: str) -> FileResponse:
+    return FileResponse(Path(__file__).resolve().parent / "static" / "index.html")
 
 
 app.mount(

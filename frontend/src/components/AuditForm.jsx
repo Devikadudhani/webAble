@@ -1,13 +1,31 @@
 import React from "react";
 import { Evidence } from "./Common";
 import { list, readable } from "../utils";
-export function Header({ onNew }) {
+export function Header({ onNew, hasResults = false }) {
   return (
     <header className="site-header">
       <a className="brand" href="/">
         WebAble
       </a>
-      <button type="button" className="header-new secondary" onClick={onNew}>+ New audit</button>
+      <nav className="site-nav" aria-label="Main navigation">
+        {hasResults ? (
+          <>
+            <a href="#baseline-website">Captured views</a>
+            <a href="#results">Report</a>
+          </>
+        ) : (
+          <>
+            <a href="#how-it-works">How it works</a>
+            <a href="#audit-form">Audit</a>
+            <span className="agent-unavailable">Agent · unavailable</span>
+          </>
+        )}
+      </nav>
+      {hasResults && (
+        <button type="button" className="header-new secondary" onClick={onNew}>
+          + New audit
+        </button>
+      )}
     </header>
   );
 }
@@ -207,10 +225,11 @@ export function AuditForm({
   ready,
   response,
   onSubmit,
+  hidden = false,
   ...props
 }) {
   return (
-    <form id="audit-form" onSubmit={onSubmit}>
+    <form id="audit-form" onSubmit={onSubmit} hidden={hidden}>
       <section className="panel" aria-label="Start an audit">
         <label className="field-label" htmlFor="audit-url">
           Website URL <span aria-hidden="true">*</span>
@@ -227,10 +246,10 @@ export function AuditForm({
         <div className="url-actions">
           <button id="submit-button" disabled={loading || !ready}>
             {loading
-              ? "Running audit…"
+              ? "Auditing website…"
               : response
-                ? "Save answers & update audit"
-                : "Run audit →"}
+                ? "Re-scan website →"
+                : "Audit website →"}
           </button>
           <span>WCAG 2.2 · axe-core · 3 viewports · Browser tested</span>
         </div>
@@ -246,30 +265,31 @@ export function AuditForm({
     </form>
   );
 }
-export function AuditLoading() {
+export function AuditLoading({ url }) {
   return (
     <section id="audit-loading" className="panel" role="status">
-      <p className="eyebrow">AUDIT IN PROGRESS</p>
-      <h2>Waiting for your audit results</h2>
+      <p className="eyebrow">WEBABLE AUDIT · IN PROGRESS</p>
+      <h2>Auditing website</h2>
+      <p className="audit-target">{url}</p>
       <div className="indeterminate" aria-hidden="true" />
       <p>
-        Your audit may be queued while other audits finish. Checks run on the
-        server and cover desktop, tablet, and mobile, so results can take
-        several minutes. A 404 from the website being audited may be recorded
-        as a finding; it does not necessarily mean your audit failed.
+        The server does not report detailed stage progress, so this indicator
+        is intentionally indeterminate. The audit captures desktop, tablet,
+        and mobile before returning its evidence.
       </p>
       <ul className="stages">
         {[
-          "Opening website",
-          "Testing desktop",
-          "Testing tablet",
-          "Testing mobile",
-          "Running accessibility checks",
-          "Building evaluation",
+          "Capture browser views",
+          "Analyze accessibility and responsive evidence",
+          "Consolidate findings and verification context",
         ].map((s) => (
           <li key={s}>{s}</li>
         ))}
       </ul>
+      <p>
+        A 404 from the website being audited may be recorded as a finding; it
+        does not necessarily mean your audit request failed.
+      </p>
     </section>
   );
 }

@@ -37,6 +37,9 @@ class TextReflowMeasurement:
     document_horizontal_overflow_px: int
     overflow_boundaries: list[dict] = field(default_factory=list)
     inspected_text_elements: int = 0
+    discovered_text_elements: int = 0
+    max_inspected_elements: int = MAX_INSPECTED_ELEMENTS
+    candidates_truncated: bool = False
 
 
 @dataclass(frozen=True)
@@ -67,6 +70,7 @@ class TextReflowScenario:
     measurement: TextReflowMeasurement | None = None
     baseline_measurement: TextReflowMeasurement | None = None
     findings: list[TextReflowFinding] = field(default_factory=list)
+    findings_truncated: bool = False
     screenshot_ref: str | None = None
     details: list[str] = field(default_factory=list)
 
@@ -112,6 +116,7 @@ _MEASURE_PAGE = """async (options) => {
     const all = document.querySelectorAll("*");
     const idCounts = new Map();
     const textCandidates = [];
+    let textCandidateCount = 0;
     const selectorCache = new WeakMap();
     const selectorFor = (element) => {
       const cached = selectorCache.get(element);
@@ -177,11 +182,13 @@ _MEASURE_PAGE = """async (options) => {
         idCounts.set(element.id, (idCounts.get(element.id) || 0) + 1);
       }
       if (
-        textCandidates.length <= maxElements &&
         visible(element) &&
         textBearing(element)
       ) {
-        textCandidates.push(element);
+        textCandidateCount += 1;
+        if (textCandidates.length < maxElements) {
+          textCandidates.push(element);
+        }
       }
     }
     const originalViewport = {
@@ -435,8 +442,10 @@ _MEASURE_PAGE = """async (options) => {
           scrollHeight: Math.max(doc.scrollHeight, body ? body.scrollHeight : 0)
         },
         inspectedTextElements: elementEvidence.length,
+        candidateCount: textCandidateCount,
+        maxInspectedElements: maxElements,
         appliedSpacingElements: originalSpacingStyles.length,
-        candidatesTruncated: textCandidates.length > maxElements,
+        candidatesTruncated: textCandidateCount > maxElements,
         elements: elementEvidence,
         controls,
         controlsTruncated: document.querySelectorAll(controlQuery).length > maxElements,
@@ -837,6 +846,7 @@ def _measurement(raw: dict) -> TextReflowMeasurement:
     width = int(viewport["width"])
     height = int(viewport["height"])
     scroll_width = int(document["scrollWidth"])
+    inspected_text_elements = int(raw.get("inspectedTextElements", 0))
     return TextReflowMeasurement(
         viewport_width=width,
         viewport_height=height,
@@ -846,7 +856,14 @@ def _measurement(raw: dict) -> TextReflowMeasurement:
         document_scroll_height=int(document["scrollHeight"]),
         document_horizontal_overflow_px=max(0, scroll_width - width),
         overflow_boundaries=raw.get("overflowBoundaries", []),
-        inspected_text_elements=int(raw.get("inspectedTextElements", 0)),
+        inspected_text_elements=inspected_text_elements,
+        discovered_text_elements=int(
+            raw.get("candidateCount", inspected_text_elements)
+        ),
+        max_inspected_elements=int(
+            raw.get("maxInspectedElements", MAX_INSPECTED_ELEMENTS)
+        ),
+        candidates_truncated=bool(raw.get("candidatesTruncated", False)),
     )
 
 
@@ -855,7 +872,7 @@ def _analyze(
     raw: dict,
     baseline: dict | None,
     criterion_id: str,
-) -> tuple[ScenarioClassification, list[TextReflowFinding]]:
+) -> tuple[ScenarioClassification, list[TextReflowFinding], bool]:
     baseline_elements = {
         item["selector"]: item for item in (baseline or {}).get("elements", [])
     }
@@ -1378,14 +1395,13 @@ def _analyze(
                     ),
                 )
             )
+    findings_truncated = len(findings) > MAX_FINDINGS
     findings = findings[:MAX_FINDINGS]
     if any(finding.classification == "violation" for finding in findings):
-        return "violation", findings
-    if findings or (baseline or {}).get("candidatesTruncated") or raw.get(
-        "candidatesTruncated"
-    ):
-        return "needs_review", findings
-    return "no_violation_detected", []
+        return "violation", findings, findings_truncated
+    if findings or not raw.get("elements"):
+        return "needs_review", findings, findings_truncated
+    return "no_violation_detected", findings, findings_truncated
 
 
 async def _capture_scenario_evidence(
@@ -1885,7 +1901,7 @@ async def _snapshot_orientation(page: TextReflowPage) -> dict:
 def _orientation_findings(
     portrait: dict,
     landscape: dict,
-) -> tuple[list[TextReflowFinding], bool]:
+) -> tuple[list[TextReflowFinding], bool, bool]:
     portrait_elements = {
         item["selector"]: item
         for item in portrait.get("elements", [])
@@ -1974,14 +1990,13 @@ def _orientation_findings(
                 ),
             )
         )
-        if len(findings) >= MAX_FINDINGS:
-            break
+    findings_truncated = len(findings) > MAX_FINDINGS
     truncated = bool(
         portrait.get("candidatesTruncated")
         or landscape.get("candidatesTruncated")
-        or len(findings) >= MAX_FINDINGS
+        or findings_truncated
     )
-    return findings, truncated
+    return findings[:MAX_FINDINGS], truncated, findings_truncated
 
 
 async def _audit_orientation(
@@ -2032,7 +2047,9 @@ async def _audit_orientation(
             else:
                 landscape = state
         assert portrait is not None and landscape is not None
-        findings, truncated = _orientation_findings(portrait, landscape)
+        findings, truncated, findings_truncated = _orientation_findings(
+            portrait, landscape
+        )
         if truncated:
             details.append(
                 f"Text/control discovery reached the {MAX_INSPECTED_ELEMENTS}-element limit in at least one orientation; an empty result is inconclusive."
@@ -2123,6 +2140,7 @@ async def _audit_orientation(
                 else None
             ),
             findings=findings,
+            findings_truncated=findings_truncated,
             screenshot_ref=screenshot_ref,
             details=details,
         )
@@ -2245,7 +2263,7 @@ async def audit_text_reflow(
             ),
             timeout=SCENARIO_TIMEOUT_SECONDS,
         )
-        classification, findings = _analyze(
+        classification, findings, findings_truncated = _analyze(
             "text_200_percent", enlarged, baseline, "1.4.4"
         )
         scenario_details = [
@@ -2259,6 +2277,14 @@ async def audit_text_reflow(
             scenario_details.append(
                 f"Text-element inspection was capped at {MAX_INSPECTED_ELEMENTS} candidates."
             )
+        if classification == "no_violation_detected":
+            scenario_details.append(
+                "No violation was detected in the inspected text-element sample; this bounded probe does not establish that every page element passes."
+            )
+        if findings_truncated:
+            scenario_details.append(
+                f"Finding output was limited to {MAX_FINDINGS} items."
+            )
         text_scenario = TextReflowScenario(
             scenario_id="text_200_percent",
             status="completed",
@@ -2271,6 +2297,7 @@ async def audit_text_reflow(
             measurement=_measurement(enlarged),
             baseline_measurement=_measurement(baseline),
             findings=findings,
+            findings_truncated=findings_truncated,
             details=scenario_details,
         )
         measurement_completed = True
@@ -2344,7 +2371,7 @@ async def audit_text_reflow(
             ),
             timeout=SCENARIO_TIMEOUT_SECONDS,
         )
-        classification, findings = _analyze(
+        classification, findings, findings_truncated = _analyze(
             "text_spacing", spaced, baseline, "1.4.12"
         )
         scenario_details = [
@@ -2357,6 +2384,10 @@ async def audit_text_reflow(
         if spaced.get("controlsTruncated"):
             scenario_details.append(
                 f"Interactive-control inspection was capped at {MAX_INSPECTED_ELEMENTS} candidates."
+            )
+        if findings_truncated:
+            scenario_details.append(
+                f"Finding output was limited to {MAX_FINDINGS} items."
             )
         if any(
             finding.evidence.get("container_measurements", {}).get("scrollContainer")
@@ -2386,6 +2417,7 @@ async def audit_text_reflow(
             measurement=_measurement(spaced),
             baseline_measurement=_measurement(baseline),
             findings=findings,
+            findings_truncated=findings_truncated,
             details=scenario_details,
         )
         spacing_measurement_completed = True
@@ -2595,7 +2627,7 @@ async def audit_text_reflow(
                 ),
                 timeout=SCENARIO_TIMEOUT_SECONDS,
             )
-            classification, findings = _analyze(
+            classification, findings, findings_truncated = _analyze(
                 "reflow_320_css_px", narrow, baseline, "1.4.10"
             )
             scenario_details = [
@@ -2609,6 +2641,14 @@ async def audit_text_reflow(
                 scenario_details.append(
                     f"Baseline text-element discovery was capped at {MAX_INSPECTED_ELEMENTS} candidates."
                 )
+            if classification == "no_violation_detected":
+                scenario_details.append(
+                    "No violation was detected in the inspected text-element sample; this bounded probe does not establish that every page element passes."
+                )
+            if findings_truncated:
+                scenario_details.append(
+                    f"Finding output was limited to {MAX_FINDINGS} items."
+                )
             narrow_scenario = TextReflowScenario(
                 scenario_id="reflow_320_css_px",
                 status="completed",
@@ -2621,6 +2661,7 @@ async def audit_text_reflow(
                 measurement=_measurement(narrow),
                 baseline_measurement=_measurement(baseline),
                 findings=findings,
+                findings_truncated=findings_truncated,
                 details=scenario_details,
             )
             narrow_scenario = await _capture_scenario_evidence(
@@ -2688,7 +2729,7 @@ async def audit_text_reflow(
                         ),
                         timeout=SCENARIO_TIMEOUT_SECONDS,
                     )
-                    classification, findings = _analyze(
+                    classification, findings, findings_truncated = _analyze(
                         "reflow_256_css_px_height",
                         short_height,
                         baseline,
@@ -2706,6 +2747,7 @@ async def audit_text_reflow(
                         baseline_measurement=_measurement(baseline),
                         measurement=_measurement(short_height),
                         findings=findings,
+                        findings_truncated=findings_truncated,
                         details=[
                             "Detection of two-dimensional content is heuristic. The 256-pixel height condition does not decide whether a specific table, diagram, or other region qualifies for the WCAG exception."
                         ],

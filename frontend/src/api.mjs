@@ -14,6 +14,24 @@ export async function runAudit(
   } = {},
 ) {
   const startedAt = now();
+  const submission = await createAuditJob(payload, { fetcher, requestTimeoutMs });
+  while (now() - startedAt < maxWaitMs) {
+    await pause(Math.min(POLL_INTERVAL_MS, maxWaitMs - (now() - startedAt)));
+    if (now() - startedAt >= maxWaitMs) break;
+    const job = await getAuditJob(submission.job_id, { fetcher, requestTimeoutMs });
+    if (job.status === "completed") return job.result;
+    if (job.status === "failed") throw new Error(job.error?.detail || "The audit failed. Please try again.");
+    if (job.status !== "pending") throw new Error("The server returned an unknown audit status.");
+  }
+  throw new Error(
+    "The audit is still pending after 15 minutes. The server may have restarted or be overloaded. Check the Render logs, then try again.",
+  );
+}
+
+export async function createAuditJob(
+  payload,
+  { fetcher = fetch, requestTimeoutMs = REQUEST_TIMEOUT_MS } = {},
+) {
   const submission = await readApiResponse(
     await fetchWithTimeout(
       fetcher,
@@ -28,24 +46,21 @@ export async function runAudit(
     "The audit request",
   );
   if (!submission.job_id) throw new Error("The server did not return an audit ID.");
-  while (now() - startedAt < maxWaitMs) {
-    await pause(Math.min(POLL_INTERVAL_MS, maxWaitMs - (now() - startedAt)));
-    if (now() - startedAt >= maxWaitMs) break;
-    const job = await readApiResponse(
-      await fetchWithTimeout(
-        fetcher,
-        `/captures/jobs/${encodeURIComponent(submission.job_id)}`,
-        {},
-        requestTimeoutMs,
-      ),
-      "Checking the audit",
-    );
-    if (job.status === "completed") return job.result;
-    if (job.status === "failed") throw new Error(job.error?.detail || "The audit failed. Please try again.");
-    if (job.status !== "pending") throw new Error("The server returned an unknown audit status.");
-  }
-  throw new Error(
-    "The audit is still pending after 15 minutes. The server may have restarted or be overloaded. Check the Render logs, then try again.",
+  return submission;
+}
+
+export async function getAuditJob(
+  jobId,
+  { fetcher = fetch, requestTimeoutMs = REQUEST_TIMEOUT_MS } = {},
+) {
+  return readApiResponse(
+    await fetchWithTimeout(
+      fetcher,
+      `/captures/jobs/${encodeURIComponent(jobId)}`,
+      {},
+      requestTimeoutMs,
+    ),
+    "Checking the audit",
   );
 }
 

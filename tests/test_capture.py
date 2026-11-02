@@ -15,7 +15,13 @@ from app.analyzers.element_horizontal_overflow import (
 )
 from app.analyzers.element_layout_evidence import enrich_element_layout_evidence
 from app.analyzers.keyboard_focus import audit_keyboard_focus
-from app.analyzers.text_reflow import _MEASURE_PAGE, audit_text_reflow
+from app.analyzers.text_reflow import (
+    MAX_FINDINGS,
+    _MEASURE_PAGE,
+    _analyze,
+    _orientation_findings,
+    audit_text_reflow,
+)
 from app.capture.runner import BrowserCapture
 from app.capture.responsive import capture_responsive_viewports
 from app.capture.storage import LocalScreenshotStorage
@@ -240,8 +246,17 @@ def test_capture_endpoint_returns_200_for_local_fixture(
     assert response.status_code == 200
     response_body = response.json()
     scoring = response_body["scoring"]
-    assert scoring["scoring_configuration_version"] == "1.0.0"
+    assert scoring["scoring_configuration_version"] == "1.2.0"
     assert scoring["overall_score_type"] == "partial_audit_score"
+    assert scoring["score_weight_basis"]["implemented_weight"] == 90
+    assert set(scoring["status_counts"]) == {
+        "passed", "failed", "needs_review", "not_tested",
+        "unsupported", "not_applicable", "error",
+    }
+    assert sum(scoring["status_counts"].values()) == len(scoring["criteria"])
+    assert set(scoring["viewport_coverage"]) == {"desktop", "tablet", "mobile"}
+    assert all("score_range" in item for item in scoring["dimensions"])
+    assert all("evidence_strength" in item for item in scoring["criteria"])
     assert {dimension["dimension_id"] for dimension in scoring["dimensions"]} == {
         "accessibility",
         "responsive_quality",
@@ -256,6 +271,7 @@ def test_capture_endpoint_returns_200_for_local_fixture(
     )["status"] == "unsupported"
     viewports = response_body["viewports"]
     assert [item["name"] for item in viewports] == ["desktop", "tablet", "mobile"]
+    assert all(item["technical_evidence"]["page_url"] for item in viewports)
     assert [item["viewport"] for item in viewports] == [
         {"width": 1365, "height": 768},
         {"width": 768, "height": 1024},
@@ -273,6 +289,20 @@ def test_capture_endpoint_returns_200_for_local_fixture(
     assert all(item["accessibility_scan"]["status"] == "available" for item in viewports)
     assert all(item["accessibility_scan"]["axe_version"] == "4.14.0" for item in viewports)
     assert all("text_reflow_audit" in item for item in viewports)
+    assert all(
+        "findings_truncated" in scenario
+        and (
+            scenario["measurement"] is None
+            or {
+                "discovered_text_elements",
+                "max_inspected_elements",
+                "candidates_truncated",
+            }.issubset(scenario["measurement"])
+        )
+        for item in viewports
+        for scenario in item["text_reflow_audit"]["scenarios"]
+    )
+    assert all("excluded_non_http_links" in item["functional_ux_audit"] for item in viewports)
     assert all(
         next(
             scenario for scenario in item["text_reflow_audit"]["scenarios"]
@@ -574,6 +604,30 @@ def test_functional_ux_audit_checks_links_and_images_locally(
         assert "#decorative-empty" not in {
             finding.element_selector for finding in audit.inconclusive + audit.findings
         }
+
+
+def test_functional_audit_excludes_non_http_links_from_broken_link_results():
+    from app.analyzers.functional_ux import audit_functional_ux
+
+    class NonHttpLinksPage:
+        async def evaluate(self, _expression, _options):
+            return {
+                "links": [
+                    {"selector": "#email", "href": "mailto:help@example.test"},
+                    {"selector": "#phone", "href": "tel:+15555550123"},
+                ],
+                "images": [],
+                "linksTruncated": False,
+                "imagesTruncated": False,
+            }
+
+    audit = asyncio.run(audit_functional_ux(NonHttpLinksPage(), object()))
+
+    assert audit.status == "available"
+    assert audit.checked_links == 0
+    assert audit.excluded_non_http_links == 2
+    assert audit.findings == []
+    assert audit.inconclusive == []
 
 
 def test_accessibility_scan_preserves_axe_results_and_specific_evidence(
@@ -958,6 +1012,7 @@ def test_text_measurement_caches_unique_paths_and_bounds_candidate_discovery():
                 )
                 assert result["inspectedTextElements"] == 300
                 assert result["candidatesTruncated"] is True
+                assert result["candidateCount"] > result["maxInspectedElements"] == 300
                 for expected in ("first duplicate", "second duplicate"):
                     selectors = [
                         item["selector"]
@@ -977,6 +1032,60 @@ def test_text_measurement_caches_unique_paths_and_bounds_candidate_discovery():
                 await browser.close()
 
     asyncio.run(run())
+
+
+def test_text_reflow_sampled_pass_is_qualified_and_zero_candidates_are_not_passed():
+    element = {"selector": "#text", "tagName": "p"}
+    classification, findings, findings_truncated = _analyze(
+        "text_200_percent",
+        {
+            "elements": [element],
+            "candidateCount": 301,
+            "candidatesTruncated": True,
+        },
+        {"elements": [element], "candidatesTruncated": True},
+        "1.4.4",
+    )
+    empty_classification, empty_findings, _ = _analyze(
+        "text_200_percent",
+        {"elements": [], "candidateCount": 0, "candidatesTruncated": False},
+        {"elements": [], "candidatesTruncated": False},
+        "1.4.4",
+    )
+
+    assert classification == "no_violation_detected"
+    assert findings == []
+    assert findings_truncated is False
+    assert empty_classification == "needs_review"
+    assert empty_findings == []
+
+
+def test_orientation_finding_truncation_uses_greater_than_limit():
+    def elements(count):
+        return [
+            {
+                "selector": f"#text-{index}",
+                "tagName": "p",
+                "contentSignature": f"signature-{index}",
+            }
+            for index in range(count)
+        ]
+
+    exact_findings, exact_truncated, exact_findings_truncated = _orientation_findings(
+        {"elements": elements(MAX_FINDINGS)},
+        {"elements": []},
+    )
+    findings, truncated, findings_truncated = _orientation_findings(
+        {"elements": elements(MAX_FINDINGS + 1)},
+        {"elements": []},
+    )
+
+    assert len(exact_findings) == MAX_FINDINGS
+    assert not exact_truncated
+    assert not exact_findings_truncated
+    assert len(findings) == MAX_FINDINGS
+    assert truncated
+    assert findings_truncated
 
 
 def test_text_reflow_clipped_text_requires_availability_review(fixture_server):
@@ -1885,7 +1994,7 @@ def test_text_reflow_restores_styles_and_viewport_after_scenarios(
     )
 
 
-def test_text_reflow_candidate_limit_prevents_clean_classification(
+def test_text_reflow_candidate_limit_is_reported_as_bounded_probe(
     fixture_server, monkeypatch
 ):
     monkeypatch.setattr("app.analyzers.text_reflow.MAX_INSPECTED_ELEMENTS", 1)
@@ -1896,9 +2005,13 @@ def test_text_reflow_candidate_limit_prevents_clean_classification(
     )
 
     assert text_scenario.status == "completed"
-    assert text_scenario.classification == "needs_review"
+    assert text_scenario.classification == "no_violation_detected"
     assert text_scenario.findings == []
+    assert text_scenario.measurement.inspected_text_elements == 1
+    assert text_scenario.measurement.discovered_text_elements > 1
+    assert text_scenario.measurement.candidates_truncated is True
     assert any("capped at 1 candidates" in detail for detail in text_scenario.details)
+    assert any("bounded probe" in detail for detail in text_scenario.details)
 
 
 def test_text_reflow_reports_document_overflow_without_text_candidates():
@@ -1955,7 +2068,10 @@ def test_keyboard_audit_records_visible_keyboard_focus(fixture_server):
     assert result.status == "partial"
     assert sequence_check.status == "needs_review"
     assert indicator_check.status == "needs_review"
-    assert all(check.status != "pass" for check in result.checks)
+    trap_check = next(
+        check for check in result.checks if check.check_id == "keyboard_trap"
+    )
+    assert trap_check.status == "pass"
     assert result.tab_actions > 0
     assert result.shift_tab_actions == 2
     assert [finding.selector for finding in result.findings] == [
@@ -2003,7 +2119,10 @@ def test_keyboard_audit_does_not_assume_candidate_count_proves_tab_order(
 
     assert sequence.status == "needs_review"
     assert focus_order.status == "needs_review"
-    assert all(check.status != "pass" for check in result.checks)
+    trap_check = next(
+        check for check in result.checks if check.check_id == "keyboard_trap"
+    )
+    assert trap_check.status == "pass"
     evidence = sequence.evidence[0]
     assert evidence["candidate_list_truncated"] is False
     assert evidence["shift_tab_sequence"]

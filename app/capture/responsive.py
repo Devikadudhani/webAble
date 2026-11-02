@@ -83,6 +83,7 @@ TechnicalEvidenceStatus = Literal[
 @dataclass(frozen=True)
 class TechnicalEvidenceResult:
     status: TechnicalEvidenceStatus = "not_tested"
+    page_url: str | None = None
     navigation_status: NavigationStatus | None = None
     readiness_status: ReadinessStatus | None = None
     console_errors: list[str] = field(default_factory=list)
@@ -406,6 +407,7 @@ async def capture_responsive_viewports(
         )
         technical_evidence = TechnicalEvidenceResult(
             status="available" if capture_is_complete else "partial",
+            page_url=evidence.final_url or evidence.requested_url,
             navigation_status=evidence.navigation_status,
             readiness_status=evidence.readiness_status,
             console_errors=list(evidence.console_errors),

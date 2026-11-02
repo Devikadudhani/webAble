@@ -86,6 +86,7 @@ def test_capture_proxy_errors_allow_retry_without_json_parse_errors():
             await page.evaluate("window.__retry = true")
             await page.locator("#submit-button").click()
             await page.wait_for_selector("#results")
+            assert await page.get_by_text("No captured views").is_visible()
             assert await page.locator("#form-error").count() == 0
             await page.evaluate("window.__missingJob = true")
             await page.locator("#run-again").click()
@@ -93,6 +94,65 @@ def test_capture_proxy_errors_allow_retry_without_json_parse_errors():
             assert "server restarted" in await page.locator("#form-error").inner_text()
             assert await page.locator("#audit-loading").is_hidden()
             assert await page.locator("#submit-button").is_enabled()
+            await browser.close()
+
+    asyncio.run(run())
+
+
+def test_scan_route_resumes_after_refresh_and_report_route_restores_result():
+    response = {
+        "requested_url": "https://example.test",
+        "viewports": [],
+        "hybrid_evaluation": {"criteria": [], "conflicts": []},
+        "scoring": {
+            "overall_score": None,
+            "overall_coverage": None,
+            "overall_score_type": "partial_audit_score",
+            "overall_scoring_status": "insufficient_evidence",
+            "dimensions": [],
+            "criteria": [],
+            "excluded_dimensions": [],
+        },
+    }
+
+    async def run():
+        async with async_playwright() as playwright:
+            browser = await playwright.chromium.launch()
+            page = await browser.new_page()
+            await page.add_init_script(
+                """((result) => {
+                window.fetch = async (url) => {
+                  if (url === '/accessibility/questionnaire') {
+                    return Response.json({features: [], conditional_questions: []});
+                  }
+                  if (url === '/captures/jobs') return Response.json({job_id: 'resume-job'});
+                  if (url === '/captures/jobs/resume-job') {
+                    return sessionStorage.getItem('mock-scan-complete') === 'yes'
+                      ? Response.json({status: 'completed', result})
+                      : Response.json({status: 'pending'});
+                  }
+                  return Response.json({detail: 'Unexpected request'}, {status: 404});
+                };
+                })(""" + json.dumps(response) + ");"
+            )
+            await mount_react(page)
+            await page.locator("#submit-button").wait_for(state="visible")
+            await page.wait_for_function(
+                "() => !document.querySelector('#submit-button').disabled"
+            )
+            await page.locator("#audit-url").fill("https://example.test")
+            await page.locator("#submit-button").click()
+            await page.wait_for_url("**/scan/**")
+            progress = page.get_by_role("progressbar", name="Estimated scan progress")
+            assert int(await progress.get_attribute("aria-valuenow")) < 100
+            await page.evaluate("sessionStorage.setItem('mock-scan-complete', 'yes')")
+            await page.reload()
+            await page.wait_for_url("**/report/**")
+            await page.locator("#results").wait_for()
+            assert await page.get_by_role("heading", name="Accessibility audit").is_visible()
+            await page.reload()
+            await page.locator("#results").wait_for()
+            assert "/report/" in await page.evaluate("location.pathname")
             await browser.close()
 
     asyncio.run(run())
@@ -309,10 +369,33 @@ def test_dashboard_filters_safe_evidence_partial_states_and_mobile_keyboard():
                           "browser_observed": [{"analyzer_id": "axe:label", "viewport": "desktop", "summary": "Same summary", "result_status": status}
                                                for status in ["pass", "fail", "needs_review"]]}],
         },
-        "viewports": [{"name": name, "viewport": {"width": width, "height": 844}, "capture_outcome": "partial",
-                       "accessibility_scan": {"status": "available", "violations": [rule]},
-                       "target_size_audit": {"status": "available", "findings": []}}
-                      for name, width in [("desktop", 1365), ("mobile", 390)]],
+        "viewports": [
+            {
+                "name": name,
+                "viewport": {"width": width, "height": 844},
+                "capture_outcome": "partial",
+                "accessibility_scan": {"status": "available", "violations": [rule]},
+                "target_size_audit": {
+                    "status": "available",
+                    "findings": (
+                        [
+                            {
+                                "criterion_id": "2.5.8",
+                                "selector": "#small-target",
+                                "accessible_name": "Open",
+                                "width_css_px": 18,
+                                "height_css_px": 18,
+                                "left_css_px": 12,
+                                "top_css_px": 20,
+                            }
+                        ]
+                        if name == "mobile"
+                        else []
+                    ),
+                },
+            }
+            for name, width in [("desktop", 1365), ("mobile", 390)]
+        ],
     }
 
     async def run():
@@ -343,6 +426,7 @@ def test_dashboard_filters_safe_evidence_partial_states_and_mobile_keyboard():
             assert "70 / 100" in await page.locator(".dimension").inner_text()
             assert "Limited evidence" in await page.locator(".dimension").inner_text()
             assert "undefined:" not in await page.locator("#conflicts").inner_text()
+            await page.locator("#browser-evidence summary").click()
             browser_text = await page.locator("#browser-evidence").inner_text()
             for status in ["pass:", "fail:", "needs review:"]:
                 assert status in browser_text
@@ -352,18 +436,32 @@ def test_dashboard_filters_safe_evidence_partial_states_and_mobile_keyboard():
             await page.get_by_role("tab", name="Issues", exact=True).focus()
             await page.keyboard.press("Enter")
             assert await page.locator("#view-issues").is_visible()
-            assert await page.locator("#issue-list > .finding").count() == 1
-            assert "2 affected element observations" in await page.locator("#issue-list").inner_text()
-            await page.get_by_label("Axe severity").select_option("critical")
-            assert await page.locator("#issue-list > .finding").count() == 0
-            await page.get_by_label("Axe severity").select_option("all")
+            await page.get_by_label("Category").select_option("Accessibility")
+            assert await page.locator("#issue-list > li").count() == 1
+            assert "2 occurrence(s)" in await page.locator("#issue-list").inner_text()
+            await page.get_by_label("WCAG criterion").select_option("1.3.1")
+            await page.get_by_label("Severity").select_option("critical")
+            assert await page.locator("#issue-list > li").count() == 1
+            assert "No findings match these filters." in await page.locator("#issue-list").inner_text()
+            await page.get_by_label("Severity").select_option("all")
+            await page.get_by_label("WCAG criterion").select_option("all")
             await page.get_by_label("Viewport", exact=True).select_option("mobile")
-            assert "1 affected element observations" in await page.locator("#issue-list").inner_text()
-            await page.locator("#issue-list summary").first.click()
-            assert '<img src=x onerror=' in await page.locator("#issue-list pre").last.inner_text()
-            assert await page.locator("#issue-list img").count() == 0
-            assert await page.locator("#issue-list a").count() == 0
+            assert "1 occurrence(s)" in await page.locator("#issue-list").inner_text()
+            await page.locator("#issue-list button").first.click()
+            assert await page.locator(".issue-detail-pane").is_visible()
+            assert '<img src=x onerror=' in await page.locator(".issue-detail-pane pre").last.inner_text()
+            assert await page.locator(".issue-detail-pane img").count() == 0
+            assert await page.locator(".issue-detail-pane a").count() == 0
             assert not await page.evaluate("Boolean(window.__injected)")
+            await page.get_by_role("button", name="Back to findings").click()
+            assert await page.locator(".issue-list-pane").is_visible()
+            await page.get_by_label("Viewport", exact=True).select_option("all")
+            await page.get_by_label("Category").select_option("Target size")
+            assert await page.locator("#issue-list > li").count() == 1
+            await page.locator("#issue-list button").first.click()
+            assert "#small-target" in await page.locator(".issue-detail-pane").inner_text()
+            assert "18 × 18 CSS px" in await page.locator(".issue-detail-pane").inner_text()
+            await page.get_by_role("button", name="Back to findings").click()
             await page.get_by_role("tab", name="Owner Evidence", exact=True).click()
             assert "Support" in await page.locator("#owner-assessments").inner_text()
             await page.get_by_role("tab", name="Responsive", exact=True).click()
@@ -371,7 +469,7 @@ def test_dashboard_filters_safe_evidence_partial_states_and_mobile_keyboard():
             assert await page.evaluate("document.documentElement.scrollWidth <= innerWidth")
             await page.get_by_role("tab", name="WCAG", exact=True).click()
             await page.get_by_label("Evidence filter").select_option("manual")
-            assert await page.locator("#wcag-list > .finding").count() == 1
+            assert await page.locator("#wcag-list .finding").count() == 1
             await page.add_script_tag(path=str(ROOT / "node_modules/axe-core/axe.min.js"))
             violations = await page.evaluate("""async () => (await axe.run(document, {
                 runOnly: {type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']}
