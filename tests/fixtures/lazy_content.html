@@ -1,0 +1,4 @@
+<!doctype html><html><head><title>Lazy content fixture</title><style>body{min-height:1800px}#products{margin-top:1200px}</style></head><body>
+<main><h1>Collection</h1><p>Browse the collection and discover available items.</p><section id="products"><h2>Products</h2><article>Product one</article><article>Product two</article></section></main>
+<script>const target=document.querySelector('#products'); target.style.visibility='hidden'; new IntersectionObserver(entries=>{if(entries.some(e=>e.isIntersecting)){target.style.visibility='visible';target.setAttribute('data-loaded','true');}}).observe(target);</script>
+</body></html>

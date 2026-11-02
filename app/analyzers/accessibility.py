@@ -460,11 +460,11 @@ async def scan_accessibility(
         )
 
     try:
+        details: list[str] = []
         collections = {
             key: raw_result[key]
             for key in ("violations", "incomplete", "passes", "inapplicable")
         }
-        details: list[str] = []
         normalized = {}
         remaining_nodes = MAX_TOTAL_NODES
         for key, rules in collections.items():

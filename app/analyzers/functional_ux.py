@@ -86,6 +86,17 @@ class APIRequestContext(Protocol):
     ) -> APIResponse:
         ...
 
+    async def get(
+        self,
+        url: str,
+        *,
+        timeout: int,
+        max_redirects: int,
+        fail_on_status_code: bool = False,
+        headers: dict[str, str] | None = None,
+    ) -> APIResponse:
+        ...
+
 
 class FunctionalPage(Protocol):
     request: APIRequestContext
@@ -175,7 +186,7 @@ async def audit_functional_ux(
     page: FunctionalPage,
     destination_validator: DestinationValidator | None,
 ) -> FunctionalUXAuditResult:
-    """Audit rendered links with bounded HEAD checks and rendered image state."""
+    """Audit rendered links with bounded HEAD/ranged-GET checks and image state."""
     try:
         rendered = await page.evaluate(
             _COLLECT_RENDERED_ELEMENTS,
@@ -383,6 +394,7 @@ async def _check_link(
                 evidence=["Destination safety validation prohibited this URL."],
                 limitations=["The destination was not requested."],
             )
+        method = "HEAD"
         try:
             response = await request.head(
                 current_url,
@@ -407,6 +419,35 @@ async def _check_link(
         status_code = response.status
         location = response.headers.get("location")
         await response.dispose()
+        if status_code in (405, 501):
+            # Some valid destinations reject HEAD. A one-byte range GET can
+            # establish reachability without intentionally fetching the full body.
+            method = "GET"
+            try:
+                response = await request.get(
+                    current_url,
+                    timeout=REQUEST_TIMEOUT_MS,
+                    max_redirects=0,
+                    fail_on_status_code=False,
+                    headers={"Range": "bytes=0-0"},
+                )
+            except PlaywrightTimeoutError:
+                return LinkCheckResult(
+                    status="inconclusive",
+                    category="timeout",
+                    evidence=["The ranged GET fallback exceeded its timeout."],
+                    limitations=["A timeout does not establish that the destination is broken."],
+                )
+            except PlaywrightError:
+                return LinkCheckResult(
+                    status="inconclusive",
+                    category="inconclusive",
+                    evidence=["The ranged GET fallback failed before receiving an HTTP response."],
+                    limitations=["The destination could not be conclusively checked."],
+                )
+            status_code = response.status
+            location = response.headers.get("location")
+            await response.dispose()
         if status_code in (301, 302, 303, 307, 308):
             if not location:
                 return LinkCheckResult(
@@ -427,26 +468,26 @@ async def _check_link(
             return LinkCheckResult(
                 status="verified",
                 category="inconclusive",
-                evidence=[f"HEAD request returned HTTP {status_code}."],
+                evidence=[f"{method} request returned HTTP {status_code}."],
             )
         if status_code in (401, 403, 405, 408, 429, 501):
             return LinkCheckResult(
                 status="inconclusive",
                 category="inconclusive",
-                evidence=[f"HEAD request returned HTTP {status_code}."],
+                evidence=[f"{method} request returned HTTP {status_code}."],
                 limitations=["Access restrictions, rate limiting, or unsupported HEAD requests can prevent a conclusive check."],
             )
         if status_code >= 400:
             return LinkCheckResult(
                 status="observed_failure",
                 category="http_error",
-                evidence=[f"Destination returned HTTP {status_code} to a HEAD request."],
+                evidence=[f"Destination returned HTTP {status_code} to a {method} request."],
                 limitations=["The destination may respond differently to other methods or user-specific requests."],
             )
         return LinkCheckResult(
             status="inconclusive",
             category="inconclusive",
-            evidence=[f"HEAD request returned HTTP {status_code}."],
+            evidence=[f"{method} request returned HTTP {status_code}."],
             limitations=["The response status does not establish whether the destination is usable."],
         )
 

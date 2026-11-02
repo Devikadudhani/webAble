@@ -1,0 +1,4 @@
+<!doctype html><html><head><title>Slow JavaScript fixture</title></head><body>
+<main><h1>Loading products</h1><div id="products" aria-busy="true">Loading</div></main>
+<script>setTimeout(() => { const p=document.querySelector('#products'); p.textContent='Jacket · Shirt · Trousers'; p.setAttribute('aria-busy','false'); }, 900);</script>
+</body></html>

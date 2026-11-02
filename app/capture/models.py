@@ -6,6 +6,7 @@ from typing import Literal
 NavigationStatus = Literal["completed", "timeout", "failed"]
 ReadinessStatus = Literal["ready", "partial", "unavailable"]
 CaptureOutcome = Literal["completed", "partial", "navigation_timeout"]
+AccessStatus = Literal["accessible", "partial", "restricted", "unavailable"]
 
 
 @dataclass(frozen=True)
@@ -44,6 +45,19 @@ class BrowserEvidence:
     console_errors: list[str] = field(default_factory=list)
     uncaught_page_errors: list[str] = field(default_factory=list)
     failed_requests: list[FailedRequest] = field(default_factory=list)
+    redirect_chains: list[list[str]] = field(default_factory=list)
+    unloaded_image_count: int | None = None
+    loading_indicator_count: int | None = None
+    visible_content_characters: int = 0
+    analysis_eligible: bool = False
+    access_restriction_signals: list[str] = field(default_factory=list)
+    access_restriction_provider: str | None = None
+    access_restriction_reference: str | None = None
+    main_document_http_status: int | None = None
+    access_status: AccessStatus = "unavailable"
+    primary_content_characters: int = 0
+    primary_content_items: int = 0
+    readiness_elapsed_ms: int = 0
     navigation_status: NavigationStatus = "failed"
     readiness_status: ReadinessStatus = "unavailable"
     outcome: CaptureOutcome = "partial"

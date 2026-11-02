@@ -51,6 +51,7 @@ export function SummaryCards({ scoring }) {
                   {dimension.unresolved_criteria.map((criterion) => (
                     <li key={criterion.criterion_id}>
                       {criterion.name} · {readable(criterion.status)}: {criterion.action}
+                      {criterion.diagnostic ? ` ${criterion.diagnostic}` : ""}
                     </li>
                   ))}
                 </ul>

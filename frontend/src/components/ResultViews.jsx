@@ -162,6 +162,8 @@ export function ViewportCard({ viewport: v }) {
     <article className="panel">
       <h4>{readable(v.name)}</h4>
       <Badge concept="Capture" value={v.capture_outcome} />
+      <Badge concept="Website access" value={v.technical_evidence?.access_status || "unavailable"} />
+      <Badge concept="Analyzer execution" value={v.analyzer_execution_status || "not_run"} />
       {[
         ["Axe violations", v.accessibility_scan?.violations?.length],
         ["Axe review rules", v.accessibility_scan?.incomplete?.length],
@@ -178,6 +180,7 @@ export function ViewportCard({ viewport: v }) {
         title="Capture details"
         data={{
           capture_outcome: v.capture_outcome,
+          analyzer_execution_status: v.analyzer_execution_status || "not_run",
           details: v.details,
           technical_evidence: v.technical_evidence,
         }}

@@ -1,6 +1,7 @@
 import asyncio
 import struct
 import threading
+from types import SimpleNamespace
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
@@ -34,7 +35,65 @@ FIXTURES = Path(__file__).parent / "fixtures"
 class FixtureHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         path = urlparse(self.path).path
+        if path == "/pulse":
+            self.send_response(204)
+            self.end_headers()
+            return
+        if path == "/slow-api":
+            threading.Event().wait(0.7)
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(b'{"products":["coat","shirt"]}')
+            return
+        if path == "/late-products-api":
+            threading.Event().wait(2.2)
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(b'{"products":["coat","shirt","trousers"]}')
+            return
+        if path == "/slow-image":
+            threading.Event().wait(5.5)
+            body = b'<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><rect width="32" height="32" fill="blue"/></svg>'
+            self.send_response(200)
+            self.send_header("Content-Type", "image/svg+xml")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        if path == "/slow-third-party":
+            threading.Event().wait(2.5)
+            body = b'<p>Secondary promotional content</p>'
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        if path == "/inaccessible":
+            self.send_error(403, "Forbidden")
+            return
+        if path == "/akamai-denied":
+            body = b"<html><title>Access Denied</title><body>Access Denied. You don't have permission to access this server. Reference #18.5d6a3717.1793626490.389a730f https://errors.edgesuite.net/18.5d6a3717.1793626490.389a730f</body></html>"
+            self.send_response(403)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        if path == "/timeout-usable":
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(b"<!doctype html><html><head><title>Partial content</title></head><body><main><h1>Readable page</h1><p>This content is available before the response is complete.</p>")
+            self.wfile.flush()
+            threading.Event().wait(0.8)
+            self.wfile.write(b"</main></body></html>")
+            return
         if path == "/missing.png":
+            self.send_error(404)
+            return
+        if path in {"/missing.css", "/missing.js"}:
             self.send_error(404)
             return
         if path == "/valid.svg":
@@ -63,6 +122,20 @@ class FixtureHandler(BaseHTTPRequestHandler):
             "/layout-flex-grid": "layout_flex_grid.html",
             "/layout-horizontal-scroll": "layout_horizontal_scroll.html",
             "/delayed": "delayed.html",
+            "/slow-javascript": "slow_javascript.html",
+            "/lazy-content": "lazy_content.html",
+            "/spa": "spa.html",
+            "/skeleton": "skeleton.html",
+            "/content-with-skeleton": "content_with_skeleton.html",
+            "/continuous": "continuous_requests.html",
+            "/delayed-api": "delayed_api.html",
+            "/late-products": "late_products.html",
+            "/pending-image": "pending_image.html",
+            "/delayed-secondary": "delayed_secondary.html",
+            "/failed-script-style": "failed_script_style.html",
+            "/captcha": "captcha.html",
+            "/browser-error": "browser_error.html",
+            "/empty": "empty.html",
             "/failed-resource": "failed_resource.html",
             "/javascript-error": "javascript_error.html",
             "/blocked-resource": "blocked_resource.html",
@@ -202,6 +275,239 @@ def test_normal_fixture_collects_metadata_and_screenshot(fixture_server, capture
     assert (capture._storage._directory.parent / evidence.screenshot_ref).is_file()
 
 
+def test_timeout_with_usable_content_still_runs_analysis(fixture_server, tmp_path):
+    service = BrowserCapture(
+        storage=LocalScreenshotStorage(tmp_path),
+        url_validator=LocalhostValidator(),
+        navigation_timeout_ms=1_000,
+        settling_period_ms=100,
+    )
+    called = []
+
+    async def analyze(page):
+        called.append(await page.title())
+
+    evidence = asyncio.run(
+        service.capture(f"{fixture_server}/continuous", 800, 600, page_callback=analyze)
+    )
+    assert evidence.analysis_eligible is True
+    assert called == ["Continuous request fixture"]
+
+
+@pytest.mark.parametrize("path", ["slow-javascript", "lazy-content", "spa"])
+def test_complex_rendering_fixtures_reach_content_readiness(fixture_server, capture, path):
+    evidence = asyncio.run(capture.capture(f"{fixture_server}/{path}", 800, 600))
+    assert evidence.analysis_eligible is True
+    assert evidence.screenshot_ref is not None
+
+
+def test_skeleton_only_page_is_not_reported_as_meaningful_capture(
+    fixture_server, capture, monkeypatch
+):
+    import app.capture.runner as runner
+
+    monkeypatch.setattr(runner, "READINESS_TIMEOUT_MS", 800)
+    evidence = asyncio.run(capture.capture(f"{fixture_server}/skeleton", 800, 600))
+    assert evidence.analysis_eligible is False
+    assert evidence.screenshot_ref is None
+    assert evidence.readiness_status == "unavailable"
+
+
+def test_substantial_content_is_captured_while_nonblocking_skeletons_remain(
+    fixture_server, capture
+):
+    evidence = asyncio.run(
+        capture.capture(f"{fixture_server}/content-with-skeleton", 800, 600)
+    )
+    assert evidence.analysis_eligible is True
+    assert evidence.screenshot_ref is not None
+    assert evidence.primary_content_items > 0
+
+
+def test_delayed_api_renders_before_analysis(fixture_server, capture):
+    evidence = asyncio.run(capture.capture(f"{fixture_server}/delayed-api", 800, 600))
+    assert evidence.analysis_eligible is True
+    assert evidence.visible_content_characters > 20
+
+
+def test_waits_for_delayed_product_listings(fixture_server, capture):
+    inspected = []
+
+    async def analyze(page):
+        inspected.append(await page.locator("#products").inner_text())
+
+    evidence = asyncio.run(capture.capture(
+        f"{fixture_server}/late-products", 800, 600, page_callback=analyze
+    ))
+    assert evidence.access_status == "accessible"
+    assert evidence.primary_content_items >= 3
+    assert inspected and "Trousers" in inspected[0].title()
+    assert evidence.screenshot_ref is not None
+
+
+def test_ready_main_content_is_analyzed_while_image_is_pending(
+    fixture_server, capture
+):
+    inspected = []
+
+    async def analyze(page):
+        image_state = await page.locator("main img").evaluate(
+            "image => ({complete: image.complete, naturalWidth: image.naturalWidth})"
+        )
+        inspected.append((await page.locator("main h1").inner_text(), image_state))
+
+    evidence = asyncio.run(capture.capture(
+        f"{fixture_server}/pending-image", 800, 600, page_callback=analyze
+    ))
+    assert inspected and inspected[0][0] == "Collection ready"
+    assert inspected[0][1]["complete"] is False
+    assert evidence.access_status == "accessible"
+    assert evidence.unloaded_image_count >= 1
+    assert evidence.screenshot_ref is not None
+
+
+def test_delayed_secondary_resource_does_not_block_analysis(fixture_server, capture):
+    inspected = []
+
+    async def analyze(page):
+        inspected.append(await page.locator("main").inner_text())
+
+    evidence = asyncio.run(capture.capture(
+        f"{fixture_server}/delayed-secondary", 800, 600, page_callback=analyze
+    ))
+    assert inspected and "Main content is ready" in inspected[0]
+    assert evidence.access_status == "accessible"
+
+
+def test_captcha_is_restricted_and_never_analyzed(fixture_server, capture):
+    analyzed = []
+
+    async def analyze(_page):
+        analyzed.append(True)
+
+    evidence = asyncio.run(capture.capture(
+        f"{fixture_server}/captcha", 800, 600, page_callback=analyze
+    ))
+    assert evidence.access_status == "restricted"
+    assert evidence.analysis_eligible is False
+    assert evidence.outcome != "completed"
+    assert not analyzed
+
+
+def test_browser_error_page_is_not_analyzed(fixture_server, capture):
+    analyzed = []
+
+    async def analyze(_page):
+        analyzed.append(True)
+
+    evidence = asyncio.run(capture.capture(
+        f"{fixture_server}/browser-error", 800, 600, page_callback=analyze
+    ))
+    assert evidence.access_status == "unavailable"
+    assert not evidence.analysis_eligible
+    assert not analyzed
+
+
+def test_persistently_empty_page_is_bounded_and_not_retried(
+    fixture_server, capture, monkeypatch
+):
+    import app.capture.runner as runner
+
+    monkeypatch.setattr(runner, "READINESS_TIMEOUT_MS", 500)
+    navigations = []
+
+    async def analyze(_page):
+        navigations.append(True)
+
+    evidence = asyncio.run(capture.capture(
+        f"{fixture_server}/empty", 800, 600, page_callback=analyze
+    ))
+    assert evidence.access_status == "unavailable"
+    assert evidence.readiness_elapsed_ms < 2_000
+    assert not evidence.analysis_eligible
+    assert not navigations
+
+
+def test_navigation_timeout_with_visible_content_still_runs_analysis(fixture_server, tmp_path):
+    service = BrowserCapture(
+        storage=LocalScreenshotStorage(tmp_path),
+        url_validator=LocalhostValidator(),
+        navigation_timeout_ms=300,
+        settling_period_ms=50,
+    )
+    analyzed = []
+
+    async def analyze(page):
+        analyzed.append(await page.title())
+
+    evidence = asyncio.run(service.capture(
+        f"{fixture_server}/timeout-usable", 800, 600, page_callback=analyze
+    ))
+    assert evidence.navigation_status == "timeout"
+    assert evidence.analysis_eligible is True
+    assert evidence.screenshot_ref is not None
+    assert analyzed == ["Partial content"]
+
+
+def test_inaccessible_page_is_not_reported_as_success(fixture_server, capture):
+    analyzed = []
+
+    async def analyze(_page):
+        analyzed.append(True)
+
+    evidence = asyncio.run(capture.capture(
+        f"{fixture_server}/inaccessible", 800, 600, page_callback=analyze
+    ))
+    assert evidence.access_status == "restricted"
+    assert evidence.analysis_eligible is False
+    assert evidence.outcome != "completed"
+    assert not analyzed
+
+
+def test_akamai_access_denial_is_identified_and_not_analyzed(fixture_server, capture):
+    analyzed = []
+
+    async def analyze(_page):
+        analyzed.append(True)
+
+    evidence = asyncio.run(capture.capture(
+        f"{fixture_server}/akamai-denied", 800, 600, page_callback=analyze
+    ))
+    assert evidence.access_status == "restricted"
+    assert evidence.access_restriction_provider == "Akamai EdgeSuite"
+    assert evidence.access_restriction_reference == "18.5d6a3717.1793626490.389a730f"
+    assert any("could not inspect the actual website" in detail for detail in evidence.details)
+    assert not evidence.analysis_eligible
+    assert not analyzed
+
+
+def test_akamai_access_denial_diagnostics_include_provider_and_reference():
+    evidence = SimpleNamespace(
+        access_status="unavailable",
+        details=[],
+        access_restriction_signals=[],
+        access_restriction_provider=None,
+        access_restriction_reference=None,
+        main_document_http_status=403,
+    )
+    body = (
+        "Access Denied. You don't have permission to access this server. "
+        "Reference #18.5d6a3717.1793626490.389a730f "
+        "https://errors.edgesuite.net/18.5d6a3717.1793626490.389a730f"
+    )
+    assert BrowserCapture._has_access_restriction(body, "https://example.com/", evidence)
+    assert evidence.access_status == "restricted"
+    assert evidence.access_restriction_provider == "Akamai EdgeSuite"
+    assert evidence.access_restriction_reference == "18.5d6a3717.1793626490.389a730f"
+    assert any("could not inspect the actual website" in detail for detail in evidence.details)
+
+
+def test_failed_stylesheet_and_script_are_in_diagnostics(fixture_server, capture):
+    evidence = asyncio.run(capture.capture(f"{fixture_server}/failed-script-style", 800, 600))
+    failed_types = {item.resource_type for item in evidence.failed_requests}
+    assert {"script", "stylesheet"} <= failed_types
+
+
 def test_capture_endpoint_returns_200_for_local_fixture(
     fixture_server, tmp_path, monkeypatch
 ):
@@ -245,6 +551,14 @@ def test_capture_endpoint_returns_200_for_local_fixture(
         )
     assert response.status_code == 200
     response_body = response.json()
+    assert all(
+        viewport["technical_evidence"]["access_status"] == "accessible"
+        for viewport in response_body["viewports"]
+    )
+    assert all(
+        viewport["analyzer_execution_status"] == "completed"
+        for viewport in response_body["viewports"]
+    )
     scoring = response_body["scoring"]
     assert scoring["scoring_configuration_version"] == "1.2.0"
     assert scoring["overall_score_type"] == "partial_audit_score"
@@ -2478,6 +2792,7 @@ def test_capture_closes_disposable_context_when_keyboard_audit_is_cancelled(
     def mark_ready(evidence):
         evidence.outcome = "completed"
         evidence.readiness_status = "ready"
+        evidence.analysis_eligible = True
 
     monkeypatch.setattr(service, "_navigate", skip_navigation)
     monkeypatch.setattr(service, "_settle_and_collect", skip_collection)
@@ -2551,6 +2866,7 @@ def test_real_playwright_evaluation_cancellation_cleans_audit_route_and_context(
             def mark_ready(evidence):
                 evidence.outcome = "completed"
                 evidence.readiness_status = "ready"
+                evidence.analysis_eligible = True
 
             monkeypatch.setattr(service, "_navigate", prepare_page)
             monkeypatch.setattr(service, "_settle_and_collect", skip_collection)

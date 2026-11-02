@@ -1,0 +1,5 @@
+<!doctype html><html><head><title>Late product fixture</title></head><body>
+<nav><a href="#products">Women</a><a href="#products">New in</a></nav>
+<main><h1>Collection</h1><section id="products" aria-busy="true"><div class="skeleton" style="height:160px;width:90vw"></div></section></main>
+<script>fetch('/late-products-api').then(r=>r.json()).then(data=>{const el=document.querySelector('#products');el.innerHTML=data.products.map(x=>`<article>${x}</article>`).join('');el.setAttribute('aria-busy','false');});</script>
+</body></html>

@@ -60,6 +60,9 @@ export function ResultsTabs({ active, setActive }) {
 export function ResultsHeader({ response, onAgain, onNew, titleRef }) {
   const scoring = response.scoring || {},
     evaluation = response.hybrid_evaluation || {};
+  const blockedViewport = list(response.viewports).find(
+    (viewport) => viewport.technical_evidence?.access_status === "restricted",
+  );
   let hostname = response.requested_url || "Target unavailable";
   try { hostname = new URL(response.requested_url).hostname; } catch { /* Partial responses may omit the URL. */ }
   return (
@@ -97,6 +100,21 @@ export function ResultsHeader({ response, onAgain, onNew, titleRef }) {
         <Badge concept="Score type" value={scoring.overall_score_type} />
         <span className="metadata">{list(response.viewports).length} viewports</span>
       </div>
+      {blockedViewport && (
+        <aside className="access-warning" role="status">
+          <h3>Website access was blocked</h3>
+          <p>
+            {blockedViewport.technical_evidence?.access_restriction_provider
+              ? `${blockedViewport.technical_evidence.access_restriction_provider} denied this scan. `
+              : "The website returned an access restriction. "}
+            WebAble captured the denial page, so this report does not evaluate the actual website.
+            {blockedViewport.technical_evidence?.access_restriction_reference
+              ? ` Reference: ${blockedViewport.technical_evidence.access_restriction_reference}.`
+              : ""}
+          </p>
+          <p>If you administer the site, ask its CDN/site operator to allow the scan, or run WebAble against an authorized staging copy.</p>
+        </aside>
+      )}
       <p className="field-help">
         The WebAble score measures evaluated checks. Coverage measures available
         conclusive evidence. Neither is a WCAG conformance percentage.
