@@ -243,6 +243,28 @@ export function AuditForm({
           value={form.url}
           onChange={(e) => setForm((f) => ({ ...f, url: e.target.value }))}
         />
+        <label className="check-row ai-opt-in">
+          <input
+            id="ai-assistance-opt-in"
+            type="checkbox"
+            checked={Boolean(form.aiOptIn)}
+            onChange={(event) =>
+              setForm((current) => ({
+                ...current,
+                aiOptIn: event.target.checked,
+              }))
+            }
+          />
+          <span>
+            <strong>Optional AI explanations and visual review</strong>
+            <span className="field-help">
+              If selected, grouped findings, selectors, short markup snippets,
+              and eligible cropped screenshots may be sent to Groq and Gemini.
+              AI output is advisory and does not change audit findings. Leave
+              unchecked to keep all audit evidence within WebAble.
+            </span>
+          </span>
+        </label>
         <div className="url-actions">
           <button id="submit-button" disabled={loading || !ready}>
             {loading

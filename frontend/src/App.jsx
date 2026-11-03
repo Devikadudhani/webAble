@@ -42,6 +42,7 @@ const empty = () => ({
   pages: "",
   journeys: "",
   context: "",
+  aiOptIn: false,
   features: {},
   complete: false,
 });
@@ -296,7 +297,12 @@ export default function App() {
             currentScanId={currentScanId}
             baselinePersisted={baselinePersisted}
             catalog={catalog}
-            onAgain={() => void startAudit(job?.payload || buildRequest(form, answers))}
+            onAgain={(aiAssistanceOptIn) =>
+              void startAudit({
+                ...(job?.payload || buildRequest(form, answers)),
+                ai_assistance_opt_in: aiAssistanceOptIn,
+              })
+            }
             onNew={reset}
           />
         )}

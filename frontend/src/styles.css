@@ -1199,7 +1199,8 @@ main {
 }
 .intro {
   max-width:790px;
-  margin-top:86px
+  margin:86px auto 34px;
+  text-align:center
 }
 .intro>.eyebrow,.intro>p:first-child {
   margin-bottom:22px;
@@ -1208,7 +1209,8 @@ main {
   color:#a1a1a1
 }
 .intro h1 {
-  max-width:760px
+  max-width:760px;
+  margin-inline:auto
 }
 .intro .hero-line,.intro p,.intro p.hero-line {
   color:#a1a1a1
@@ -1221,25 +1223,37 @@ main {
 }
 .intro .hero-line {
   max-width:640px;
+  margin-inline:auto;
   margin-bottom:8px;
   font-size:18px
+}
+.landing #audit-form {
+  max-width:790px;
+  margin-inline:auto
 }
 .landing #audit-form>section {
   display:grid;
   grid-template-columns:minmax(0,1fr) auto;
-  gap:10px 18px;
-  align-items:end;
+  grid-template-areas:
+    "label label"
+    "url submit"
+    "consent consent"
+    "meta meta";
+  gap:12px 14px;
+  align-items:center;
   max-width:790px;
   padding:0;
   border:0;
   background:transparent
 }
 .landing #audit-form>section>.field-label {
-  grid-column:1/-1;
+  grid-area:label;
   margin-bottom:0;
+  text-align:left;
   color:#f5f5f5
 }
 .landing #audit-url {
+  grid-area:url;
   min-width:0;
   height:52px;
   background:#111;
@@ -1258,12 +1272,27 @@ input::placeholder,textarea::placeholder {
   display:contents
 }
 .url-actions button {
+  grid-area:submit;
   min-height:52px;
   white-space:nowrap
 }
 .url-actions span {
-  grid-column:1/-1;
+  grid-area:meta;
+  margin:0;
   color:#707070
+}
+.landing .ai-opt-in {
+  grid-area:consent;
+  margin:2px 0 0;
+  text-align:left
+}
+.landing .context-disclosure {
+  margin-top:26px;
+  text-align:left
+}
+.landing-story {
+  max-width:900px;
+  margin:72px auto 0
 }
 .context-disclosure {
   border-color:#2a2a2a
@@ -1652,13 +1681,26 @@ footer {
     display:none
   }
   .intro {
-    margin-top:60px
+    margin:60px auto 28px
   }
   .landing #audit-form>section {
-    grid-template-columns:1fr
+    grid-template-columns:minmax(0,1fr);
+    grid-template-areas:
+      "label"
+      "url"
+      "submit"
+      "consent"
+      "meta";
+    gap:10px
   }
   .url-actions button {
     width:100%
+  }
+  .landing .ai-opt-in {
+    margin-top:8px
+  }
+  .landing-story {
+    margin-top:52px
   }
   .product-intro {
     grid-template-columns:1fr
@@ -1855,8 +1897,175 @@ footer {
 .issue-back {
   display:none
 }
-
+.ai-opt-in {
+  display:flex;
+  align-items:flex-start;
+  gap:10px;
+  margin:16px 0;
+  color:#e5e5e5
+}
+.ai-opt-in>input,.rescan-ai-opt-in>input {
+  width:16px;
+  min-width:16px;
+  min-height:16px;
+  margin:2px 0 0;
+  accent-color:#f5f5f5
+}
+.ai-opt-in>span {
+  display:grid;
+  gap:5px
+}
+.ai-opt-in strong {
+  font-size:12px
+}
+.ai-analysis-status,.ai-insight,.ai-visual-verdict {
+  margin:14px 0;
+  padding:14px;
+  border:1px solid #343434;
+  border-radius:5px;
+  background:#101010
+}
+.ai-report-overview {
+  margin:22px 0;
+  padding:22px;
+  border:1px solid #343434;
+  border-radius:8px;
+  background:linear-gradient(135deg,#151515,#101010)
+}
+.ai-report-heading {
+  display:flex;
+  flex-wrap:wrap;
+  align-items:baseline;
+  justify-content:space-between;
+  gap:12px
+}
+.ai-report-heading .eyebrow {
+  margin:0 0 8px
+}
+.ai-report-heading h3 {
+  margin:0;
+  font-size:19px
+}
+.ai-report-overview>p {
+  max-width:860px;
+  color:#c8c8c8
+}
+.ai-report-overview .ai-report-lead {
+  margin:18px 0 8px;
+  color:#f5f5f5;
+  font-size:16px;
+  line-height:1.55
+}
+.ai-report-sections {
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(210px,1fr));
+  gap:12px;
+  margin-top:20px
+}
+.ai-report-sections>section {
+  min-width:0;
+  padding:14px;
+  border:1px solid #2a2a2a;
+  border-radius:5px;
+  background:#0b0b0b
+}
+.ai-report-sections h4,.ai-explanation-detail h5 {
+  margin:0 0 8px;
+  font-size:12px
+}
+.ai-report-sections ul,.ai-explanation-detail ol,.ai-explanation-detail ul,
+.ai-visual-verdict ul {
+  margin:0;
+  padding-left:20px;
+  color:#c8c8c8;
+  font-size:12px;
+  line-height:1.65
+}
+.ai-report-sections li+li,.ai-explanation-detail li+li,
+.ai-visual-verdict li+li {
+  margin-top:5px
+}
+.ai-explanation-detail {
+  margin-top:12px;
+  padding:10px 12px;
+  border:1px solid #2a2a2a;
+  border-radius:4px;
+  font-size:12px
+}
+.ai-explanation-detail summary {
+  cursor:pointer;
+  color:#e5e5e5
+}
+.ai-status-row {
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin-top:14px
+}
+.ai-status-row span {
+  padding:5px 8px;
+  border:1px solid #2a2a2a;
+  border-radius:4px;
+  color:#bdbdbd;
+  font-size:11px
+}
+.ai-processing-details {
+  margin-top:14px;
+  color:#bdbdbd;
+  font-size:12px
+}
+.ai-processing-details summary {
+  cursor:pointer
+}
+.ai-processing-details ul {
+  padding-left:20px;
+  line-height:1.6
+}
+.ai-explanation-detail pre {
+  overflow:auto;
+  white-space:pre-wrap;
+  overflow-wrap:anywhere
+}
+.print-all-issue-details {
+  display:none
+}
+.ai-analysis-status>strong,.ai-analysis-status>div>strong {
+  font-size:12px
+}
+.ai-analysis-status p,.ai-insight p,.ai-visual-verdict p {
+  margin:8px 0;
+  overflow-wrap:anywhere
+}
+.ai-insight-heading {
+  display:flex;
+  flex-wrap:wrap;
+  align-items:baseline;
+  justify-content:space-between;
+  gap:8px
+}
+.ai-insight-heading h4,.ai-visual-verdict h4 {
+  margin:0;
+  font-size:13px
+}
+.ai-insight>p,.ai-visual-verdict>p {
+  font-size:12px
+}
+.rescan-ai-opt-in {
+  display:flex;
+  align-items:flex-start;
+  gap:8px;
+  max-width:240px;
+  color:#c0c0c0;
+  font-size:10px;
+  line-height:1.45
+}
 @media(max-width:700px) {
+  .ai-report-overview {
+    padding:17px
+  }
+  .ai-report-sections {
+    grid-template-columns:1fr
+  }
   .issues-filters {
     grid-template-columns:1fr 1fr
   }
@@ -1891,5 +2100,166 @@ footer {
   .issue-back {
     display:inline-flex;
     margin-bottom:16px
+  }
+  .result-actions {
+    flex-wrap:wrap
+  }
+  .rescan-ai-opt-in {
+    max-width:none;
+    flex:1 0 100%
+  }
+}
+
+.print-all-captures {
+  display:none
+}
+@page {
+  size:auto;
+  margin:14mm
+}
+@media print {
+  :root {
+    color-scheme:light;
+    background:#fff!important;
+    color:#111!important
+  }
+  html,body,#root,main,.results {
+    width:100%!important;
+    max-width:none!important;
+    margin:0!important;
+    padding:0!important;
+    background:#fff!important;
+    color:#111!important
+  }
+  body,body * {
+    color:#111!important;
+    background-color:transparent!important;
+    box-shadow:none!important;
+    text-shadow:none!important
+  }
+  html,body {
+    background:#fff!important
+  }
+  .site-header,.skip-link,.site-nav,.result-actions,.result-nav,
+  .issues-filters,.issue-back,.text-action,.screenshot-modal-backdrop,
+  .raw-evidence,button {
+    display:none!important
+  }
+  .results {
+    margin:0!important
+  }
+  .viewport-selector,.comparison-controls,.visual-captures {
+    display:none!important
+  }
+  .print-all-captures {
+    display:block!important
+  }
+  .print-viewport-captures {
+    margin:16px 0;
+    break-inside:auto;
+    page-break-inside:auto
+  }
+  .print-viewport-captures>h4 {
+    margin:0 0 8px;
+    padding-bottom:6px;
+    border-bottom:1px solid #bbb
+  }
+  .print-all-captures .capture-panel {
+    margin:8px 0;
+    padding:8px 0;
+    border:0;
+    background:#fff!important
+  }
+  .print-all-captures .screenshot-stage {
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    max-height:220mm;
+    overflow:visible;
+    aspect-ratio:auto!important;
+    background:#fff!important
+  }
+  .print-all-captures .screenshot-stage>img {
+    position:static;
+    width:auto;
+    height:auto;
+    max-width:100%;
+    max-height:220mm;
+    object-fit:contain
+  }
+  .print-all-captures .enlarge-screenshot {
+    display:none!important
+  }
+  .results-heading {
+    margin-bottom:12px;
+    padding-bottom:12px;
+    border-bottom:1px solid #999
+  }
+  .result-view[hidden] {
+    display:block!important
+  }
+  .result-view {
+    display:block!important;
+    margin:0;
+    padding:10px 0;
+    break-before:page;
+    page-break-before:always
+  }
+  .result-view:first-of-type {
+    break-before:auto;
+    page-break-before:auto
+  }
+  .issues-split {
+    display:none!important
+  }
+  .print-all-issue-details {
+    display:block!important
+  }
+  .print-finding {
+    margin:12px 0;
+    padding:12px 0;
+    border-bottom:1px solid #bbb;
+    break-inside:avoid-page
+  }
+  details:not([open])>*:not(summary) {
+    display:block!important
+  }
+  details summary {
+    color:#111!important
+  }
+  .panel,.ai-report-overview,.ai-insight,.ai-visual-verdict,
+  .finding,.issue-occurrence,.dimension,.not-evaluated,
+  .ai-report-sections>section {
+    border-color:#bbb!important;
+    background:#fff!important;
+    break-inside:avoid;
+    page-break-inside:avoid
+  }
+  .ai-report-sections>section {
+    background:#fff!important
+  }
+  .field-help,.metadata,.eyebrow,.rule-id,.tags,
+  .results-heading #requested-url,.score-explanation,
+  .audit-summary p,.technical-rows dt,.chart-legend,
+  .ai-report-overview>p,.ai-report-sections ul {
+    color:#333!important
+  }
+  a {
+    color:#111!important;
+    text-decoration:underline
+  }
+  img,svg,canvas {
+    max-width:100%!important;
+    break-inside:avoid;
+    page-break-inside:avoid
+  }
+  pre {
+    white-space:pre-wrap!important;
+    overflow-wrap:anywhere!important
+  }
+  footer {
+    margin-top:16px;
+    border-color:#999!important;
+    color:#333!important
   }
 }

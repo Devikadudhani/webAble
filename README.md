@@ -86,6 +86,42 @@ configured minimum coverage (currently 40%). Lower coverage displays a reason
 instead of converting unavailable evidence into a zero score. Neither score
 nor coverage represents WCAG conformance.
 
+## Download a report
+
+Open a completed audit and select **Download PDF**. The report opens the
+browser's print dialog; choose **Save as PDF** as the destination. The PDF uses
+a white page background and includes all report tabs, even if they are not
+currently selected. It also includes the saved baseline captures for each
+viewport and, on follow-up scans, the latest captures alongside them. Browser
+print settings may still control page size, margins, and headers/footers.
+
+## Optional AI assistance
+
+AI enrichment is off by default. A user must check the consent box for each
+audit (and separately for each rescan) before grouped findings can be sent to
+Groq or eligible screenshot crops to Gemini. The service sends finding
+messages, up to three selectors per rule/category group, a short sanitized HTML sample,
+and only screenshots cropped around findings with measured element bounds.
+The requested page URL and owner questionnaire answers are not included as
+fields, though sanitized snippets may retain public host/path references. AI
+output is advisory and never changes analyzer findings, severity, scoring, or
+WCAG conclusions. The report includes a separate audit overview and structured
+finding explanations with observed behavior, potential user impact, inspection
+steps, remediation direction, confidence, and evidence limitations. Any code
+sample is optional and illustrative. Missing scores are stated as unavailable,
+not inferred. Visual opinions remain separate from analyzer verdicts.
+Provider diagnostics expose only provider/model, status, latency, reported
+token counts, and error type; they do not include credentials or raw exception messages. Identical
+opted-in AI requests can reuse a bounded in-memory cache keyed by evidence,
+prompt version, and configured model; cached text is not persisted to disk.
+
+Set `GROQ_API_KEY` and/or `GEMINI_API_KEY` in the server environment (Render's
+Environment settings in production). Optional model overrides are
+`GROQ_MODEL` and `GEMINI_MODEL`. For local development, create an ignored `.env`
+file using `.env.example` as a template. Never commit or paste live keys. When
+no provider is configured or a provider fails, the audit still completes and
+the report shows local rule-based fallback text.
+
 ## Verify
 
 ```sh

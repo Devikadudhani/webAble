@@ -15,6 +15,7 @@ export const implemented = (d) =>
 export function buildRequest(form, answers) {
   return {
     url: form.url.trim(),
+    ai_assistance_opt_in: Boolean(form.aiOptIn),
     accessibility_context: {
       representative_page_urls: lines(form.pages),
       user_journeys: lines(form.journeys).map((line) => {

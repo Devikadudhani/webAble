@@ -4,6 +4,7 @@ import { format, list, readable } from "../utils";
 
 const analyzerSources = [
   ["target_size_audit", "Target size", "target_size"],
+  ["non_text_contrast", "Non-text contrast", "non-text-contrast"],
   ["finding_normalization", "Responsive", "overflow"],
   ["functional_ux_audit", "Functional", "functional"],
 ];
@@ -13,6 +14,18 @@ function wcagReferences(tags = []) {
     .map((tag) => tag.match(/^wcag(\d)(\d)(\d+)$/i))
     .filter(Boolean)
     .map((match) => `${match[1]}.${match[2]}.${match[3]}`);
+}
+
+function aiGroupId(ruleId, category) {
+  const categoryKey = {
+    Accessibility: "accessibility",
+    "Target size": "target-size",
+    Responsive: "responsive",
+    Functional: "functional",
+    "Keyboard & focus": "keyboard-and-focus",
+    "Reflow & text": "reflow-and-text",
+  }[category] || "general";
+  return `${String(ruleId).slice(0, 95)}:${categoryKey}`.slice(0, 160);
 }
 
 function collectIssues(viewports) {
@@ -43,6 +56,7 @@ function collectIssues(viewports) {
             tags: list(rule.tags),
             rule,
             type: "axe",
+            aiGroupId: aiGroupId(ruleId, "Accessibility"),
           },
           name,
           { rule, node: null },
@@ -63,6 +77,7 @@ function collectIssues(viewports) {
             tags: list(rule.tags),
             rule,
             type: "axe",
+            aiGroupId: aiGroupId(ruleId, "Accessibility"),
           },
           name,
           { rule, node },
@@ -74,6 +89,8 @@ function collectIssues(viewports) {
       const findings =
         auditKey === "finding_normalization"
           ? list(viewport.finding_normalization?.findings)
+          : auditKey === "non_text_contrast"
+            ? list(viewport.accessibility_scan?.non_text_contrast?.findings)
           : list(viewport[auditKey]?.findings);
       for (const finding of findings) {
         const selector =
@@ -107,6 +124,16 @@ function collectIssues(viewports) {
             wcag: finding.criterion_id ? [finding.criterion_id] : [],
             type: "analyzer",
             auditKey,
+            aiGroupId: aiGroupId(
+              auditKey === "target_size_audit"
+                ? "target-size"
+                : auditKey === "non_text_contrast"
+                  ? "non-text-contrast"
+                  : auditKey === "finding_normalization"
+                    ? "overflow"
+                    : finding.rule_id,
+              category,
+            ),
           },
           name,
           finding,
@@ -148,6 +175,7 @@ function collectIssues(viewports) {
           wcag: list(check.criterion_ids),
           type: "analyzer",
           auditKey: "keyboard_focus_audit",
+          aiGroupId: aiGroupId("focus-visible", "Keyboard & focus"),
         },
         name,
         check,
@@ -169,6 +197,7 @@ function collectIssues(viewports) {
             wcag: [finding.criterion_id].filter(Boolean),
             type: "analyzer",
             auditKey: "text_reflow_audit",
+            aiGroupId: aiGroupId("reflow", "Reflow & text"),
           },
           name,
           { ...finding, scenario },
@@ -216,9 +245,97 @@ function evidenceBounds(evidence) {
   return null;
 }
 
-function IssueDetails({ issue, onShowScreenshot }) {
+function IssueDetails({ issue, aiAnalysis, onShowScreenshot }) {
+  const explanation = list(aiAnalysis?.explanations).find(
+    (item) => item.group_id === issue.aiGroupId,
+  );
+  const visualChecks = list(aiAnalysis?.visual_checks).filter(
+    (item) => item.group_id === issue.aiGroupId,
+  );
   return (
     <div className="issue-detail-content">
+      {explanation && (
+        <section className="ai-insight">
+          <div className="ai-insight-heading">
+            <h4>{explanation.title || "AI explanation"}</h4>
+            <span className="metadata">Advisory · {explanation.source}</span>
+          </div>
+          <p>{explanation.explanation}</p>
+          {explanation.what_is_happening && (
+            <p>
+              <strong>What the evidence shows:</strong>{" "}
+              {explanation.what_is_happening}
+            </p>
+          )}
+          {explanation.why_it_matters && (
+            <p>
+              <strong>Why it may matter:</strong> {explanation.why_it_matters}
+            </p>
+          )}
+          <p>
+            <strong>Who may be affected:</strong>{" "}
+            {explanation.who_is_affected}
+          </p>
+          <p>
+            <strong>Suggested fix direction:</strong> {explanation.fix_hint}
+          </p>
+          <p className="field-help">
+            Advisory follow-up priority {explanation.priority}/5 ·{" "}
+            {explanation.priority_reason} · {readable(explanation.confidence)} confidence
+          </p>
+          {list(explanation.reproduction_steps).length > 0 && (
+            <section className="ai-explanation-detail">
+              <h5>How to inspect</h5>
+              <ol>
+                {explanation.reproduction_steps.map((step, index) => (
+                  <li key={index}>{step}</li>
+                ))}
+              </ol>
+            </section>
+          )}
+          {explanation.code_example && (
+            <details className="ai-explanation-detail">
+              <summary>Illustrative code suggestion</summary>
+              <pre>{explanation.code_example}</pre>
+              <p className="field-help">
+                Review this suggestion in the context of the site before using it.
+              </p>
+            </details>
+          )}
+          {list(explanation.evidence_limitations).length > 0 && (
+            <details className="ai-explanation-detail">
+              <summary>AI evidence limitations</summary>
+              <ul>
+                {explanation.evidence_limitations.map((limitation, index) => (
+                  <li key={index}>{limitation}</li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </section>
+      )}
+      {visualChecks.map((check) => (
+        <section className="ai-visual-verdict" key={check.finding_id}>
+          <h4>AI visual opinion · {readable(check.verdict)}</h4>
+          {check.visible_observation && <p>{check.visible_observation}</p>}
+          <p>{check.reason}</p>
+          {check.visual_impact && (
+            <p>
+              <strong>Potential visual impact:</strong> {check.visual_impact}
+            </p>
+          )}
+          {list(check.limitations).length > 0 && (
+            <ul>
+              {check.limitations.map((limitation, index) => (
+                <li key={index}>{limitation}</li>
+              ))}
+            </ul>
+          )}
+          <p className="field-help">
+            This opinion does not confirm or remove an analyzer finding.
+          </p>
+        </section>
+      ))}
       {issue.type === "axe" && (
         <>
           <p>{issue.rule.description || "No description returned."}</p>
@@ -306,6 +423,7 @@ function IssueDetails({ issue, onShowScreenshot }) {
 export default function Issues({
   viewports,
   baseline,
+  aiAnalysis,
   isFollowUp,
   onShowScreenshot,
 }) {
@@ -373,6 +491,24 @@ export default function Issues({
         </div>
         <span className="metadata">{filteredIssues.length} findings</span>
       </div>
+      {aiAnalysis && (
+        <section className="ai-analysis-status" aria-label="AI analysis status">
+          <div>
+            <strong>Optional AI assistance · {readable(aiAnalysis.status)}</strong>
+            {aiAnalysis.stats && (
+              <p className="field-help">
+                {aiAnalysis.stats.raw_findings} source findings ·{" "}
+                {aiAnalysis.stats.issue_groups} groups ·{" "}
+                {aiAnalysis.stats.explained_groups} explanations ·{" "}
+                {aiAnalysis.stats.vision_calls} visual checks
+              </p>
+            )}
+          </div>
+          {list(aiAnalysis.details).map((detail, index) => (
+            <p className="field-help" key={index}>{detail}</p>
+          ))}
+        </section>
+      )}
       <div className="issues-filters" aria-label="Issue filters">
         <label className="issue-search">
           Search findings
@@ -536,6 +672,7 @@ export default function Issues({
               </div>
               <IssueDetails
                 issue={selectedIssue}
+                aiAnalysis={aiAnalysis}
                 onShowScreenshot={onShowScreenshot}
               />
               <p className="field-help">
@@ -549,6 +686,27 @@ export default function Issues({
             </p>
           )}
         </aside>
+      </div>
+      <div className="print-all-issue-details">
+        <h4>Finding details</h4>
+        {issues.map((issue) => (
+          <article className="print-finding" key={issue.key}>
+            <h4>{issue.title}</h4>
+            <div className="issue-detail-badges">
+              <Badge value={issue.status} />
+              <Badge value={issue.impact} concept="Reported severity" />
+            </div>
+            <p className="field-help">
+              {issue.category}
+              {issue.wcag.length > 0 ? ` · WCAG ${issue.wcag.join(", ")}` : ""}
+            </p>
+            <IssueDetails
+              issue={issue}
+              aiAnalysis={aiAnalysis}
+              onShowScreenshot={onShowScreenshot}
+            />
+          </article>
+        ))}
       </div>
     </section>
   );

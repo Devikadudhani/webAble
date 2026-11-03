@@ -228,6 +228,47 @@ def test_adaptive_frontend_preserves_answers_and_distinguishes_evidence():
                 },
             ],
         },
+        "ai_analysis": {
+            "status": "available",
+            "groups": [{"group_id": "label:accessibility", "count": 2}],
+            "audit_summary": {
+                "overall_summary": "The audit found incomplete accessibility evidence.",
+                "health_assessment": "The available evidence does not establish conformance.",
+                "key_strengths": ["Several viewports completed."],
+                "major_concerns": ["Controls need accessible names."],
+                "recommended_actions": ["Review the affected control."],
+                "limitations": ["Some checks are sampled."],
+                "source": "groq",
+            },
+            "explanations": [
+                {
+                    "group_id": "label:accessibility",
+                    "title": "Controls need accessible names",
+                    "explanation": "The controls need accessible names.",
+                    "what_is_happening": "A form control has no accessible name.",
+                    "why_it_matters": "Assistive technology users may not know the control's purpose.",
+                    "who_is_affected": "People using assistive technology.",
+                    "reproduction_steps": ["Open the form.", "Inspect the control name."],
+                    "fix_hint": "Give each control a programmatic label.",
+                    "code_example": None,
+                    "priority": 2,
+                    "priority_reason": "The analyzer reported a serious issue.",
+                    "confidence": "medium",
+                    "evidence_limitations": ["One viewport was sampled."],
+                    "source": "groq",
+                }
+            ],
+            "visual_checks": [],
+            "stats": {
+                "raw_findings": 2,
+                "issue_groups": 1,
+                "explained_groups": 1,
+                "vision_calls": 0,
+            },
+            "details": [
+                "AI output is advisory and does not change analyzer findings."
+            ],
+        },
         "viewports": [
             {
                 "browser_feature_discovery": {
@@ -306,6 +347,8 @@ def test_adaptive_frontend_preserves_answers_and_distinguishes_evidence():
             await page.locator("#features-complete").check()
             await page.locator("#submit-button").click()
             await page.wait_for_selector("#results:not([hidden])")
+            assert "Audit overview" in await page.locator(".ai-report-overview").inner_text()
+            assert "The audit found incomplete accessibility evidence." in await page.locator(".ai-report-overview").inner_text()
 
             requests = await page.evaluate("window.__requests")
             assert len(requests) == 1
@@ -369,6 +412,36 @@ def test_dashboard_filters_safe_evidence_partial_states_and_mobile_keyboard():
                           "browser_observed": [{"analyzer_id": "axe:label", "viewport": "desktop", "summary": "Same summary", "result_status": status}
                                                for status in ["pass", "fail", "needs_review"]]}],
         },
+        "ai_analysis": {
+            "status": "available",
+            "audit_summary": {
+                "overall_summary": "Audit summary from bounded evidence.",
+                "health_assessment": "The overall score is unavailable.",
+                "key_strengths": [],
+                "major_concerns": ["A control needs an accessible name."],
+                "recommended_actions": ["Review the form control."],
+                "limitations": ["The audit includes sampled evidence."],
+                "source": "groq",
+            },
+            "explanations": [
+                {
+                    "group_id": "label:accessibility",
+                    "title": "Label the form control",
+                    "explanation": "The controls need accessible names.",
+                    "what_is_happening": "The control has no accessible name.",
+                    "why_it_matters": "Some users may not know what the control does.",
+                    "who_is_affected": "People using assistive technology.",
+                    "reproduction_steps": ["Open the form.", "Inspect the control."],
+                    "fix_hint": "Provide a programmatic label.",
+                    "code_example": None,
+                    "priority": 2,
+                    "priority_reason": "The analyzer reported a serious issue.",
+                    "confidence": "medium",
+                    "evidence_limitations": ["The test is bounded."],
+                    "source": "groq",
+                }
+            ],
+        },
         "viewports": [
             {
                 "name": name,
@@ -407,16 +480,60 @@ def test_dashboard_filters_safe_evidence_partial_states_and_mobile_keyboard():
             page.on("pageerror", lambda error: errors.append(str(error)))
             await page.add_init_script("""(response => {
                 window.__response = response;
-                window.fetch = async (url) => url === '/accessibility/questionnaire'
+                window.__lastCapturePayload = null;
+                window.fetch = async (url, options = {}) => url === '/accessibility/questionnaire'
                     ? {ok: true, json: async () => ({features: [], conditional_questions: []})}
                     : window.__fail ? {ok: false, json: async () => ({detail: 'Capture failed'})}
-                    : url === '/captures/jobs' ? Response.json({job_id: 'test'})
+                    : url === '/captures/jobs' ? (window.__lastCapturePayload = JSON.parse(options.body), Response.json({job_id: 'test'}))
                     : Response.json({status: 'completed', result: window.__response});
             })(""" + json.dumps(response) + ");")
             await mount_react(page)
             await page.locator("#audit-url").fill("https://example.test")
+            assert not await page.locator("#ai-assistance-opt-in").is_checked()
+            await page.locator("#ai-assistance-opt-in").check()
             await page.locator("#submit-button").click()
+            await page.wait_for_timeout(500)
+            assert not errors, errors
             await page.wait_for_selector("#results:not([hidden])")
+            assert "Audit summary from bounded evidence." in await page.locator(".ai-report-overview").inner_text()
+            assert await page.evaluate("window.__lastCapturePayload.ai_assistance_opt_in") is True
+            await page.evaluate("""() => {
+                window.__pdfPrint = null;
+                window.print = () => {
+                    window.__pdfPrint = {
+                        title: document.title,
+                        allViewsVisible: [...document.querySelectorAll('.result-view')]
+                            .every((view) => !view.hidden),
+                        printViewports: [...document.querySelectorAll(
+                            '.print-viewport-captures > h4'
+                        )].map((heading) => heading.textContent.trim()),
+                        printCapturesVisible: getComputedStyle(
+                            document.querySelector('.print-all-captures')
+                        ).display !== 'none',
+                        selectedCaptureHidden: getComputedStyle(
+                            document.querySelector('.visual-captures')
+                        ).display === 'none',
+                    };
+                };
+            }""")
+            await page.emulate_media(media="print")
+            await page.evaluate(
+                "document.querySelector('.result-actions button').click()"
+            )
+            await page.wait_for_function("() => window.__pdfPrint !== null")
+            pdf_print = await page.evaluate("window.__pdfPrint")
+            assert pdf_print["title"].startswith("WebAble-audit-example.test-")
+            assert pdf_print["allViewsVisible"]
+            assert pdf_print["printViewports"] == [
+                "desktop captured views",
+                "mobile captured views",
+            ]
+            assert pdf_print["printCapturesVisible"]
+            assert pdf_print["selectedCaptureHidden"]
+            assert await page.locator("body").evaluate(
+                "(element) => getComputedStyle(element).backgroundColor"
+            ) == "rgb(255, 255, 255)"
+            await page.emulate_media(media="screen")
             assert "Score unavailable" in await page.locator("#summary-cards").inner_text()
             deferred = page.locator(".not-evaluated")
             assert await deferred.count() == 2
@@ -449,6 +566,9 @@ def test_dashboard_filters_safe_evidence_partial_states_and_mobile_keyboard():
             assert "1 occurrence(s)" in await page.locator("#issue-list").inner_text()
             await page.locator("#issue-list button").first.click()
             assert await page.locator(".issue-detail-pane").is_visible()
+            assert "What the evidence shows" in await page.locator(".issue-detail-pane").inner_text()
+            assert "How to inspect" in await page.locator(".issue-detail-pane").inner_text()
+            assert "Provide an accessible name." in await page.locator(".issue-detail-pane").inner_text()
             assert '<img src=x onerror=' in await page.locator(".issue-detail-pane pre").last.inner_text()
             assert await page.locator(".issue-detail-pane img").count() == 0
             assert await page.locator(".issue-detail-pane a").count() == 0
@@ -476,12 +596,15 @@ def test_dashboard_filters_safe_evidence_partial_states_and_mobile_keyboard():
             })).violations.map(v => ({id: v.id, targets: v.nodes.map(n => n.target)}))""")
             assert not violations
             await page.evaluate("window.__fail = true")
+            await page.get_by_label("Send this rescan’s evidence for optional AI analysis").check()
             await page.locator("#run-again").click()
+            assert await page.evaluate("window.__lastCapturePayload.ai_assistance_opt_in") is True
             await page.wait_for_selector("#form-error:not([hidden])")
             assert "Capture failed" in await page.locator("#form-error").inner_text()
             assert await page.locator("#audit-loading").is_hidden()
             await page.evaluate("window.__fail = false; window.__response = {}")
             await page.locator("#run-again").click()
+            assert await page.evaluate("window.__lastCapturePayload.ai_assistance_opt_in") is False
             await page.wait_for_selector("#results:not([hidden])")
             assert "Score unavailable" in await page.locator("#summary-cards").inner_text()
             await page.locator("#new-audit").click()

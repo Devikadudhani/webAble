@@ -14,8 +14,16 @@ from typing import Literal
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StrictBool,
+    field_validator,
+    model_validator,
+)
 from playwright.async_api import Error as PlaywrightError
+from dotenv import load_dotenv
 
 from app.analyzers.audit_aggregation import (
     AggregationStatus,
@@ -25,6 +33,7 @@ from app.analyzers.audit_aggregation import (
 from app.analyzers.audit_summary import (
     build_audit_summary,
 )
+from app.analyzers.ai_enrichment import run_ai_layer
 from app.analyzers.accessibility import AccessibilityScanStatus
 from app.analyzers.accessibility import NonTextContrastStatus
 from app.analyzers.element_horizontal_overflow import (
@@ -94,6 +103,8 @@ from app.capture.runner import (
 )
 from app.capture.storage import LocalScreenshotStorage
 from app.capture.url_safety import PublicURLSafetyValidator, UnsafeURL
+
+load_dotenv()
 
 OUTPUT_DIR = Path(os.getenv("WEBABLE_OUTPUT_DIR", "output"))
 def _bounded_timeout(name: str, default: int, minimum: int, maximum: int) -> int:
@@ -167,6 +178,7 @@ app = FastAPI(
 
 class CaptureRequest(BaseModel):
     url: str = Field(min_length=1, max_length=4_096)
+    ai_assistance_opt_in: StrictBool = False
     accessibility_context: "AccessibilityContextRequest" = Field(
         default_factory=lambda: AccessibilityContextRequest()
     )
@@ -704,6 +716,24 @@ class ResponsiveViewportResponse(BaseModel):
     details: list[str]
 
 
+class AIEnrichmentSchema(BaseModel):
+    status: Literal["available", "partial", "unavailable"]
+    groups: list[dict]
+    explanations: list[dict]
+    visual_checks: list[dict]
+    stats: dict[str, int | None]
+    details: list[str]
+    audit_summary: dict | None = None
+    explanation_status: Literal[
+        "available", "partial", "unavailable", "not_requested"
+    ] = "not_requested"
+    visual_status: Literal[
+        "available", "partial", "unavailable", "not_requested"
+    ] = "not_requested"
+    provider_diagnostics: list[dict] = Field(default_factory=list)
+    limitations: list[str] = Field(default_factory=list)
+
+
 class ResponsiveCaptureResponse(BaseModel):
     requested_url: str
     viewports: list[ResponsiveViewportResponse]
@@ -711,6 +741,7 @@ class ResponsiveCaptureResponse(BaseModel):
     audit_findings: AuditFindingAggregationSchema
     audit_summary: AuditSummarySchema
     scoring: AuditScoringSchema
+    ai_analysis: "AIEnrichmentSchema | None" = None
 
     @classmethod
     def from_results(
@@ -1063,6 +1094,258 @@ class CaptureErrorEnvelope(BaseModel):
     detail: CaptureErrorResponse
 
 
+def _ai_finding_bounds(value: object) -> dict[str, float] | None:
+    if not isinstance(value, dict):
+        return None
+    for candidate in (value, value.get("bounds"), value.get("target_rect")):
+        if not isinstance(candidate, dict):
+            continue
+        left = candidate.get("left", candidate.get("x"))
+        top = candidate.get("top", candidate.get("y"))
+        width = candidate.get("width")
+        height = candidate.get("height")
+        if all(
+            isinstance(number, (int, float)) and not isinstance(number, bool)
+            for number in (left, top, width, height)
+        ):
+            return {
+                "left": float(left),
+                "top": float(top),
+                "width": float(width),
+                "height": float(height),
+            }
+    evidence = value.get("evidence")
+    if isinstance(evidence, dict):
+        return _ai_finding_bounds(evidence)
+    return None
+
+
+def _ai_findings(response: ResponsiveCaptureResponse) -> list[dict]:
+    findings = []
+    for viewport in response.viewports:
+        viewport_name = viewport.name
+        screenshot_ref = viewport.screenshot_ref
+        for result_type, rules in (
+            ("violation", viewport.accessibility_scan.violations),
+            ("needs_review", viewport.accessibility_scan.incomplete),
+        ):
+            for rule in rules:
+                for index, node in enumerate(rule.nodes):
+                    target = "; ".join(
+                        " → ".join(item) if isinstance(item, list) else item
+                        for item in node.target
+                    )
+                    findings.append(
+                        {
+                            "id": f"axe:{viewport_name}:{rule.rule_id}:{index}",
+                            "rule_id": rule.rule_id,
+                            "category": "accessibility",
+                            "severity": rule.impact or "unknown",
+                            "selector": target,
+                            "html": node.html,
+                            "message": node.failure_summary or rule.description,
+                            "viewport": viewport_name,
+                            "needs_review": result_type == "needs_review",
+                            "status": (
+                                "needs_review"
+                                if result_type == "needs_review"
+                                else "fail"
+                            ),
+                            "screenshot_ref": screenshot_ref,
+                            "bounds": _ai_finding_bounds(node.model_dump()),
+                        }
+                    )
+
+        for index, finding in enumerate(viewport.target_size_audit.findings):
+            findings.append(
+                {
+                    "id": f"target-size:{viewport_name}:{index}",
+                    "rule_id": "target-size",
+                    "category": "target size",
+                    "severity": "needs_review",
+                    "selector": finding.selector,
+                    "html": "",
+                    "message": (
+                        f"Measured pointer target is {finding.width_css_px} by "
+                        f"{finding.height_css_px} CSS pixels."
+                    ),
+                    "viewport": viewport_name,
+                    "needs_review": True,
+                    "status": "needs_review",
+                    "screenshot_ref": screenshot_ref,
+                    "bounds": {
+                        "left": finding.left_css_px,
+                        "top": finding.top_css_px,
+                        "width": finding.width_css_px,
+                        "height": finding.height_css_px,
+                    },
+                }
+            )
+
+        for index, finding in enumerate(
+            viewport.accessibility_scan.non_text_contrast.findings
+        ):
+            findings.append(
+                {
+                    "id": f"non-text-contrast:{viewport_name}:{index}",
+                    "rule_id": "non-text-contrast",
+                    "category": "accessibility",
+                    "severity": "needs_review",
+                    "selector": finding.selector,
+                    "html": "",
+                    "message": (
+                        "A sampled non-text component may need manual contrast review."
+                    ),
+                    "viewport": viewport_name,
+                    "needs_review": True,
+                    "status": "needs_review",
+                    "screenshot_ref": screenshot_ref,
+                    "bounds": _ai_finding_bounds(
+                        {"bounds": finding.geometry}
+                    ),
+                }
+            )
+
+        for index, finding in enumerate(viewport.finding_normalization.findings):
+            findings.append(
+                {
+                    "id": f"overflow:{viewport_name}:{index}",
+                    "rule_id": "overflow",
+                    "category": "responsive",
+                    "severity": "needs_review",
+                    "selector": finding.selector,
+                    "html": "",
+                    "message": finding.explanation,
+                    "viewport": viewport_name,
+                    "needs_review": True,
+                    "status": "needs_review",
+                    "screenshot_ref": screenshot_ref,
+                    "bounds": None,
+                }
+            )
+
+        for index, finding in enumerate(viewport.functional_ux_audit.findings):
+            findings.append(
+                {
+                    "id": f"functional:{viewport_name}:{index}",
+                    "rule_id": finding.rule_id,
+                    "category": "functional",
+                    "severity": "serious",
+                    "selector": finding.element_selector,
+                    "html": "",
+                    "message": "; ".join(finding.evidence) or finding.failure_category,
+                    "viewport": viewport_name,
+                    "needs_review": finding.status != "observed_failure",
+                    "status": (
+                        "fail"
+                        if finding.status == "observed_failure"
+                        else "needs_review"
+                    ),
+                    "screenshot_ref": screenshot_ref,
+                    "bounds": None,
+                }
+            )
+
+        for index, finding in enumerate(viewport.keyboard_focus_audit.findings):
+            if finding.focus_indicator_detected is not False and not finding.obscured:
+                continue
+            findings.append(
+                {
+                    "id": f"keyboard:{viewport_name}:{index}",
+                    "rule_id": "focus-visible",
+                    "category": "keyboard and focus",
+                    "severity": "needs_review",
+                    "selector": finding.selector,
+                    "html": "",
+                    "message": (
+                        "Keyboard focus indicator or visibility requires review."
+                    ),
+                    "viewport": viewport_name,
+                    "needs_review": True,
+                    "status": "needs_review",
+                    "screenshot_ref": screenshot_ref,
+                    "bounds": _ai_finding_bounds(finding.model_dump()),
+                }
+            )
+
+        for scenario in viewport.text_reflow_audit.scenarios:
+            for index, finding in enumerate(scenario.findings):
+                findings.append(
+                    {
+                        "id": f"reflow:{viewport_name}:{scenario.scenario_id}:{index}",
+                        "rule_id": "reflow",
+                        "category": "reflow and text",
+                        "severity": "serious",
+                        "selector": finding.selector,
+                        "html": "",
+                        "message": finding.observation,
+                        "viewport": viewport_name,
+                        "needs_review": finding.classification != "violation",
+                        "status": (
+                            "fail"
+                            if finding.classification == "violation"
+                            else "needs_review"
+                        ),
+                        "screenshot_ref": (
+                            finding.screenshot_ref or scenario.screenshot_ref
+                        ),
+                        "bounds": _ai_finding_bounds(finding.evidence),
+                    }
+                )
+    return findings
+
+
+def _ai_audit_context(response: ResponsiveCaptureResponse) -> dict:
+    scoring = response.scoring
+    dimensions = [
+        {
+            "name": item.name,
+            "score": item.score,
+            "coverage_percentage": item.coverage_percentage,
+            "scoring_status": item.scoring_status,
+            "implemented": item.implemented,
+        }
+        for item in scoring.dimensions[:10]
+    ]
+    limitations = list(scoring.limitations)
+    limitations.extend(response.audit_summary.limitations)
+    return {
+        "overall_scoring_status": scoring.overall_scoring_status,
+        "overall_score": scoring.overall_score,
+        "overall_coverage": scoring.overall_coverage,
+        "status_counts": scoring.status_counts,
+        "viewport_coverage": scoring.viewport_coverage,
+        "dimensions": dimensions,
+        "viewports": [
+            {
+                "name": viewport.name,
+                "capture_outcome": viewport.capture_outcome,
+                "width": viewport.viewport.width,
+                "height": viewport.viewport.height,
+            }
+            for viewport in response.viewports[:3]
+        ],
+        "limitations": list(dict.fromkeys(limitations))[:8],
+    }
+
+
+def _load_ai_screenshot(finding: dict) -> bytes | None:
+    reference = finding.get("screenshot_ref")
+    if not isinstance(reference, str) or not reference.startswith("screenshots/"):
+        return None
+    filename = Path(reference).name
+    if not re.fullmatch(
+        r"(?:[a-f0-9]{32}|scenario_[A-Za-z0-9_-]+_[A-Za-z0-9_-]+_"
+        r"[A-Za-z0-9_-]+_[0-9]+x[0-9]+)\.png",
+        filename,
+    ):
+        return None
+    path = OUTPUT_DIR / "screenshots" / filename
+    if not path.is_file() or path.stat().st_size > 5_000_000:
+        return None
+    return path.read_bytes()
+
+
 @app.post(
     "/captures",
     response_model=ResponsiveCaptureResponse,
@@ -1101,6 +1384,43 @@ async def create_capture(request: CaptureRequest) -> ResponsiveCaptureResponse:
             accessibility_context=request.accessibility_context,
         )
         retained_screenshots = _screenshot_references(response.model_dump(mode="json"))
+        if request.ai_assistance_opt_in:
+            ai_findings = _ai_findings(response)
+            try:
+                ai_result = await asyncio.to_thread(
+                    run_ai_layer,
+                    ai_findings,
+                    _load_ai_screenshot,
+                    _ai_audit_context(response),
+                )
+            except Exception as error:
+                logging.getLogger(__name__).exception(
+                    "Opted-in AI enrichment failed (%s); preserving audit result.",
+                    type(error).__name__,
+                )
+                ai_result = {
+                    "status": "unavailable",
+                    "groups": [],
+                    "explanations": [],
+                    "visual_checks": [],
+                    "audit_summary": None,
+                    "explanation_status": "unavailable",
+                    "visual_status": "unavailable",
+                    "provider_diagnostics": [],
+                    "limitations": [
+                        "AI analysis could not complete; audit results are unchanged."
+                    ],
+                    "stats": {
+                        "raw_findings": len(ai_findings),
+                        "issue_groups": 0,
+                        "explained_groups": 0,
+                        "vision_calls": 0,
+                    },
+                    "details": [
+                        "AI analysis could not complete; the audit findings are unchanged."
+                    ],
+                }
+            response.ai_analysis = AIEnrichmentSchema.model_validate(ai_result)
         return response
     except UnsafeURL as error:
         raise HTTPException(

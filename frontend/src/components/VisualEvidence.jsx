@@ -178,6 +178,9 @@ export default function VisualEvidence({
   const [highlight, setHighlight] = useState(null);
   const [zoom, setZoom] = useState(null);
   const [baselineImageAvailability, setBaselineImageAvailability] = useState({});
+  const printAll =
+    typeof document !== "undefined" &&
+    document.body.classList.contains("printing-report");
   const names = orderedNames(baseline?.viewports);
   const isFollowUp = Boolean(baseline?.scan_id && scanId !== baseline.scan_id);
   const baselineScoringVersion = baseline?.scoring_configuration_version;
@@ -403,6 +406,44 @@ export default function VisualEvidence({
               </div>
             )}
           </div>
+          {printAll && (
+            <div className="print-all-captures">
+              {availableNames.map((name) => {
+                const before = list(baseline?.viewports).find(
+                  (viewport) => viewport.name === name,
+                );
+                const after = currentViewports.find(
+                  (viewport) => viewport.name === name,
+                );
+                const initialCapture = before || (!isFollowUp ? after : null);
+                return (
+                  <section className="print-viewport-captures" key={name}>
+                    <h4>{readable(name)} captured views</h4>
+                    {isFollowUp ? (
+                      <Snapshot
+                        title="Before · First saved scan"
+                        viewport={before}
+                        onEnlarge={() => {}}
+                      />
+                    ) : (
+                      <Snapshot
+                        title="First saved scan"
+                        viewport={initialCapture}
+                        onEnlarge={() => {}}
+                      />
+                    )}
+                    {isFollowUp && after && (
+                      <Snapshot
+                        title="After · Latest scan"
+                        viewport={after}
+                        onEnlarge={() => {}}
+                      />
+                    )}
+                  </section>
+                );
+              })}
+            </div>
+          )}
           {isFollowUp && (
             <p className="verification-note">
               A re-scan shows what the automated checks observed; it does not

@@ -8,7 +8,7 @@ import {
   ScoringDimensionView,
 } from "./ResultViews";
 import { Badge, Evidence, Paginated } from "./Common";
-import { limitations, list } from "../utils";
+import { limitations, list, readable } from "../utils";
 import VisualEvidence from "./VisualEvidence";
 const tabs = [
   ["overview", "Overview"],
@@ -57,7 +57,93 @@ export function ResultsTabs({ active, setActive }) {
     </div>
   );
 }
-export function ResultsHeader({ response, onAgain, onNew, titleRef }) {
+
+function AIReportOverview({ analysis }) {
+  const summary = analysis?.audit_summary;
+  if (!summary) return null;
+  const sections = [
+    ["Key strengths", summary.key_strengths],
+    ["Major concerns", summary.major_concerns],
+    ["Recommended next steps", summary.recommended_actions],
+    ["Evidence limitations", summary.limitations],
+  ].filter(([, items]) => Array.isArray(items) && items.length > 0);
+  return (
+    <section className="ai-report-overview" aria-labelledby="ai-report-title">
+      <div className="ai-report-heading">
+        <div>
+          <p className="eyebrow">OPTIONAL AI INTERPRETATION</p>
+          <h3 id="ai-report-title">Audit overview</h3>
+        </div>
+        <span className="metadata">
+          Advisory · {summary.source === "template" ? "local fallback" : summary.source}
+        </span>
+      </div>
+      <p className="ai-report-lead">{summary.overall_summary}</p>
+      <p>{summary.health_assessment}</p>
+      {sections.length > 0 && (
+        <div className="ai-report-sections">
+          {sections.map(([title, items]) => (
+            <section key={title}>
+              <h4>{title}</h4>
+              <ul>
+                {items.map((item, index) => (
+                  <li key={`${title}:${index}`}>{item}</li>
+                ))}
+              </ul>
+            </section>
+          ))}
+        </div>
+      )}
+      <p className="field-help">
+        This interpretation is based on the captured evidence and does not
+        change analyzer findings, severity, scores, or conformance conclusions.
+      </p>
+      <div className="ai-status-row">
+        <span>Explanations · {readable(analysis.explanation_status)}</span>
+        <span>Visual review · {readable(analysis.visual_status)}</span>
+        <span>{analysis.stats?.issue_groups ?? 0} issue groups</span>
+        <span>{analysis.stats?.vision_succeeded ?? 0} visual checks completed</span>
+        <span>
+          Provider tokens · {Number.isFinite(analysis.stats?.total_tokens)
+            ? analysis.stats.total_tokens
+            : "not reported"}
+        </span>
+        <span>
+          Provider time · {Number.isFinite(analysis.stats?.provider_latency_ms)
+            ? `${analysis.stats.provider_latency_ms} ms`
+            : "not reported"}
+        </span>
+      </div>
+      {list(analysis.provider_diagnostics).length > 0 && (
+        <details className="ai-processing-details">
+          <summary>AI provider diagnostics</summary>
+          <ul>
+            {list(analysis.provider_diagnostics).map((item, index) => (
+              <li key={`${item.provider}:${item.status}:${index}`}>
+                {readable(item.provider)} · {readable(item.status)}
+                {item.model ? ` · ${item.model}` : ""}
+                {Number.isFinite(item.latency_ms)
+                  ? ` · ${item.latency_ms} ms`
+                  : ""}
+                {item.error_type ? ` · ${readable(item.error_type)}` : ""}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </section>
+  );
+}
+
+export function ResultsHeader({
+  response,
+  onDownloadPdf,
+  onAgain,
+  onNew,
+  titleRef,
+  aiRescanOptIn,
+  setAiRescanOptIn,
+}) {
   const scoring = response.scoring || {},
     evaluation = response.hybrid_evaluation || {};
   const blockedViewport = list(response.viewports).find(
@@ -76,6 +162,17 @@ export function ResultsHeader({ response, onAgain, onNew, titleRef }) {
           <p id="requested-url" title={response.requested_url}>{hostname}</p>
         </div>
         <div className="result-actions">
+          <button type="button" className="secondary" onClick={onDownloadPdf}>
+            Download PDF
+          </button>
+          <label className="rescan-ai-opt-in">
+            <input
+              type="checkbox"
+              checked={aiRescanOptIn}
+              onChange={(event) => setAiRescanOptIn(event.target.checked)}
+            />
+            Send this rescan’s evidence for optional AI analysis
+          </label>
           <button id="run-again" type="button" onClick={onAgain}>
             Run again
           </button>
@@ -132,11 +229,36 @@ export default function ResultsDashboard({
   onNew,
 }) {
   const [active, setActive] = useState("overview"),
+    [isPrinting, setIsPrinting] = useState(false),
     [evidenceRequest, setEvidenceRequest] = useState(null),
+    [aiRescanOptIn, setAiRescanOptIn] = useState(false),
     title = useRef(null);
   const scoring = response.scoring || {},
     evaluation = response.hybrid_evaluation || {},
     viewports = list(response.viewports);
+  function downloadPdf() {
+    const previousTitle = document.title;
+    let hostname = "website";
+    try {
+      hostname = new URL(response.requested_url).hostname;
+    } catch {
+      // Partial reports may not include a valid requested URL.
+    }
+    const safeHostname = hostname.replace(/[^a-z0-9.-]/gi, "-");
+    const date = new Date().toISOString().slice(0, 10);
+    document.title = `WebAble-audit-${safeHostname}-${date}`;
+    document.body.classList.add("printing-report");
+    setIsPrinting(true);
+    window.requestAnimationFrame(() => {
+      try {
+        window.print();
+      } finally {
+        document.title = previousTitle;
+        document.body.classList.remove("printing-report");
+        setIsPrinting(false);
+      }
+    });
+  }
   function showScreenshot(name, bounds, label) {
     setEvidenceRequest({
       name,
@@ -152,13 +274,24 @@ export default function ResultsDashboard({
     title.current?.scrollIntoView({ block: "start" });
   }, [response]);
   return (
-    <section id="results" className="results" aria-labelledby="results-title">
+    <section
+      id="results"
+      className={`results${isPrinting ? " is-printing" : ""}`}
+      aria-labelledby="results-title"
+    >
       <ResultsHeader
         response={response}
-        onAgain={onAgain}
+        onDownloadPdf={downloadPdf}
+        onAgain={() => {
+          onAgain(aiRescanOptIn);
+          setAiRescanOptIn(false);
+        }}
         onNew={onNew}
         titleRef={title}
+        aiRescanOptIn={aiRescanOptIn}
+        setAiRescanOptIn={setAiRescanOptIn}
       />
+      <AIReportOverview analysis={response.ai_analysis} />
       <SummaryCards scoring={scoring} />
       {list(evaluation.conflicts).length > 0 && (
         <aside id="conflicts" className="conflicts">
@@ -187,7 +320,7 @@ export default function ResultsDashboard({
           role="tabpanel"
           aria-labelledby={`tab-${id}`}
           tabIndex="0"
-          hidden={active !== id}
+          hidden={active !== id && !isPrinting}
         >
           {id === "overview" ? (
             <Overview
@@ -200,6 +333,7 @@ export default function ResultsDashboard({
             <Issues
               viewports={viewports}
               baseline={visualBaseline}
+              aiAnalysis={response.ai_analysis}
               isFollowUp={Boolean(
                 visualBaseline?.scan_id &&
                   currentScanId !== visualBaseline.scan_id,

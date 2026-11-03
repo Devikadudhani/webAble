@@ -18,6 +18,29 @@ The service reuses one Chromium process between captures; every viewport still
 gets a fresh browser context that is closed after its evidence is collected.
 The shared browser is closed during application shutdown.
 
+AI enrichment is optional and disabled unless the audit request includes
+`ai_assistance_opt_in: true`. The dashboard asks for this consent separately
+for an initial scan and every rescan. When opted in, the server sends grouped
+analyzer messages, up to three selectors per group, and a short sanitized axe
+HTML sample to configured Groq/Gemini providers. Gemini visual checks are capped
+at six and receive only a PNG crop around a finding with reliable element
+bounds; findings without such coordinates do not trigger a visual request. The
+explicit requested page URL and owner questionnaire answers are not included in
+the AI payload, though sanitized snippets may retain public host/path references.
+Full screenshots are not sent. Provider failure does not fail the audit; local rule-aware fallback text is
+marked as a template. The opt-in report can include a separate evidence-bound
+audit overview, structured finding guidance, and richer visual opinions. It
+reports unavailable scores as unavailable and includes evidence limitations.
+Provider diagnostics contain only provider/model, status, latency, reported
+token counts, and error type. Identical opted-in requests may reuse a bounded in-memory cache keyed by
+evidence, prompt version, and configured model. AI responses are schema
+validated and linked only to existing finding groups; they remain advisory and
+never remove findings, alter analyzer severity/scoring, or establish WCAG
+conformance.
+Configure `GROQ_API_KEY`, `GEMINI_API_KEY`, and optional model overrides in
+server environment settings, not source control. `.env.example` contains
+placeholders only.
+
 Each successful viewport's `screenshot_ref` points to the exact Playwright PNG
 captured before analysis mutations. The report serves these files through
 `GET /captures/screenshots/{filename}` and the frontend saves the first scan's
