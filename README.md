@@ -81,6 +81,21 @@ tab resumes polling from session storage. Completed reports are available at
 restart, expired in-memory job, or unavailable browser storage requires a new
 scan.
 
+## Screenshot retention
+
+Each successful audit always captures and persists exactly three baseline PNGs:
+desktop (1365x768), tablet (768x1024), and mobile (390x844). Text reflow,
+orientation, and hover/focus probes still run on all applicable viewports, but
+their measurements and findings do not create persisted images during a normal
+audit. Set `WEBABLE_PERSIST_SCENARIO_SCREENSHOTS=true` only for an explicitly
+requested diagnostic run that needs saved visual evidence of a failing scenario.
+This policy is process configuration, so it applies identically to local and
+Render Docker runs. Gemini visual review of baseline-state findings uses the
+persisted baseline image and a bounded in-memory crop; it does not write a
+second crop file. A transformed text-reflow or interaction state has no visual
+AI review unless diagnostic scenario capture is explicitly enabled, because a
+baseline image would not be valid evidence for that transformed state.
+
 The overall score is shown only when conclusive evidence reaches the
 configured minimum coverage (currently 40%). Lower coverage displays a reason
 instead of converting unavailable evidence into a zero score. Neither score
@@ -128,5 +143,33 @@ the report shows local rule-based fallback text.
 npm run build
 .venv/bin/python -m pytest tests/test_questionnaire_frontend.py
 ```
+
+## Test categories
+
+Pytest uses `C:\tmp\webable-pytest` as its base temporary directory on the
+supported Windows setup. This avoids both the user-profile Temp directory,
+which may be managed or denied, and this OneDrive-synced checkout, whose files
+may be briefly locked during pytest cleanup.
+
+```powershell
+# Deterministic classification tests: no Chromium or internet.
+python -m pytest -m unit
+
+# Browser integration: Chromium plus local HTML fixtures only.
+python -m pytest -m browser_integration
+
+# Existing full local suite. It may include browser tests, but no public-site test.
+python -m pytest
+
+# One external Chromium preflight. It stops immediately when the environment
+# blocks external networking; add --benchmark only after a successful preflight.
+python scripts/external_compatibility.py
+python scripts/external_compatibility.py --benchmark
+```
+
+External results use `passed`, `blocked_by_test_environment`,
+`blocked_by_target`, or `inconclusive`. A test-environment block is not an
+application failure. Render must be verified separately against its deployed
+service and logs; local results do not establish Render compatibility.
 
 Frontend sources live in `frontend/src`; generated assets live in `app/static`. The browser tests exercise the production build, adaptive questionnaire payloads, evidence safety, filters, keyboard tabs, mobile layout, partial data and unavailable dimensions. They use contract fixtures, never fallback results in the application. Backend and capture documentation remains in `docs/`.

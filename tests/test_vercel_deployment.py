@@ -109,11 +109,17 @@ def test_vercel_requires_remote_browser(tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize("failure", [False, True])
-def test_vercel_request_cleans_screenshots(monkeypatch, failure):
+def test_vercel_request_cleans_screenshots(monkeypatch, failure, tmp_path):
     from app import main
 
     monkeypatch.setenv("VERCEL", "1")
     monkeypatch.setattr(main.url_validator, "validate", AsyncMock())
+    # Test cleanup must not depend on pre-existing user screenshots in output/.
+    monkeypatch.setattr(
+        main,
+        "capture_service",
+        BrowserCapture(LocalScreenshotStorage(tmp_path), main.url_validator),
+    )
     outputs = []
 
     async def audit(url, capture, **kwargs):
@@ -135,6 +141,8 @@ def test_vercel_request_cleans_screenshots(monkeypatch, failure):
 
 def test_bundled_axe_matches_npm():
     root = Path(__file__).resolve().parents[1]
-    assert (root / "app/vendor/axe.min.js").read_bytes() == (
+    # Git may check the vendored text file out as CRLF on Windows while npm
+    # retains LF. Compare the JavaScript content, not checkout line endings.
+    assert (root / "app/vendor/axe.min.js").read_text(encoding="utf-8") == (
         root / "node_modules/axe-core/axe.min.js"
-    ).read_bytes()
+    ).read_text(encoding="utf-8")

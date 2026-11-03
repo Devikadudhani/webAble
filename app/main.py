@@ -141,6 +141,12 @@ CAPTURE_TIMEOUT_SECONDS = _bounded_timeout(
 )
 MAX_CONCURRENT_CAPTURES = max(1, int(os.getenv("WEBABLE_MAX_CONCURRENT_CAPTURES", "1")))
 MAX_PENDING_CAPTURES = max(1, int(os.getenv("WEBABLE_MAX_PENDING_CAPTURES", "20")))
+# Normal audits retain one baseline image for each mandatory viewport. Scenario
+# probes still run and retain their structured measurements; this opt-in is for
+# a deliberately requested diagnostic capture, not ordinary report generation.
+PERSIST_SCENARIO_SCREENSHOTS = os.getenv(
+    "WEBABLE_PERSIST_SCENARIO_SCREENSHOTS", "false"
+).strip().lower() in {"1", "true", "yes", "on"}
 JOB_RETENTION_SECONDS = 900
 capture_jobs: dict[str, dict] = {}
 capture_tasks: set[asyncio.Task] = set()
@@ -1374,6 +1380,8 @@ async def create_capture(request: CaptureRequest) -> ResponsiveCaptureResponse:
                     destination_validator=url_validator,
                     scenario_screenshot_capture=(
                         capture_service.save_scenario_screenshot
+                    if PERSIST_SCENARIO_SCREENSHOTS
+                    else None
                     ),
                 ),
                 timeout=CAPTURE_TIMEOUT_SECONDS,
