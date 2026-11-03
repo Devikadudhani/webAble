@@ -1,4 +1,5 @@
 import React from "react";
+import { scorePresentation } from "../scoringPresentation.mjs";
 import {
   Bar,
   BarChart,
@@ -12,11 +13,12 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { list, readable } from "../utils";
+import { format, list, readable } from "../utils";
 
 const isNumber = (value) => typeof value === "number" && Number.isFinite(value);
 
 export default function ReportAnalytics({ scoring }) {
+  const presentation = scorePresentation(scoring);
   const criteria = list(scoring.criteria);
   const dimensions = list(scoring.dimensions)
     .filter((dimension) => dimension.implemented)
@@ -41,6 +43,8 @@ export default function ReportAnalytics({ scoring }) {
       <p className="field-help">
         Charts summarize only checks and evidence returned by this scan.
       </p>
+      <p className="field-help analytics-score-summary">Overall score: {presentation.available ? `${format(scoring.overall_score)} / 100` : "unavailable"} · {format(scoring.overall_coverage)}% evidence coverage · {presentation.label}</p>
+
       <div className="analytics-grid">
         <article className="panel analytics-chart">
           <h4>Dimension score and coverage</h4>
@@ -53,7 +57,7 @@ export default function ReportAnalytics({ scoring }) {
                   <YAxis domain={[0, 100]} tick={{ fill: "#a1a1a1", fontSize: 11 }} />
                   <Tooltip
                     contentStyle={{ background: "#111", border: "1px solid #444" }}
-                    formatter={(value) => value == null ? "Unavailable" : `${value}%`}
+                    formatter={(value, name) => value == null ? "Unavailable" : name === "Score" ? `${value} / 100` : `${value}%`}
                   />
                   <Legend />
                   <Bar dataKey="Score" fill="#f5f5f5" />

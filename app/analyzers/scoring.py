@@ -31,13 +31,15 @@ EvidenceStrength = Literal["deterministic", "bounded_probe", "heuristic"]
 ScoringStatus = Literal[
     "insufficient_evidence",
     "provisional",
+    "low_evidence",
+    "very_limited_evidence",
     "valid_moderate_coverage",
     "valid_high_coverage",
     "not_implemented",
     "not_scored",
 ]
 
-SCORING_CONFIGURATION_VERSION = "1.3.0"
+SCORING_CONFIGURATION_VERSION = "1.4.1"
 VIEWPORT_ORDER = ("desktop", "tablet", "mobile")
 
 _NAME_RULES = frozenset(
@@ -97,10 +99,11 @@ class ScoringConfiguration:
     score_validity_thresholds: tuple[tuple[float, ScoringStatus], ...] = (
         (90.0, "valid_high_coverage"),
         (70.0, "valid_moderate_coverage"),
-        (30.0, "provisional"),
-        (0.0, "insufficient_evidence"),
+        (30.0, "low_evidence"),
+        (0.0, "very_limited_evidence"),
     )
-    minimum_overall_coverage: float = 30.0
+    # Quality warning boundary only; never a score eligibility requirement.
+    minimum_overall_coverage: float = 70.0
     score_labels: tuple[tuple[float, str], ...] = (
         (90.0, "excellent"),
         (80.0, "good"),
@@ -603,10 +606,22 @@ def _normalize_viewport(
     observations: dict[str, list[_Observation]],
 ) -> None:
     viewport = result.name
+    if result.technical_evidence.access_status == "restricted":
+        return  # Challenge or access-denied page evidence cannot score the website.
     _normalize_axe(result.accessibility_scan, viewport, observations)
     _normalize_keyboard(result.keyboard_focus_audit, viewport, observations)
     _normalize_text_reflow(result.text_reflow_audit, viewport, observations)
     _normalize_target_size(result.target_size_audit, viewport, observations)
+    # axe target-size violations are conclusive; geometric candidates remain review-only.
+    target_violations = [
+        rule for rule in result.accessibility_scan.violations
+        if rule.rule_id == "target-size"
+    ]
+    if target_violations:
+        observations["accessibility.target_size"].append(_Observation(
+            viewport, "fail", "axe_core", details="axe target-size reported a violation.",
+            data=[_rule_data(rule) for rule in target_violations], confidence="high",
+        ))
     _normalize_overflow(result, viewport, observations)
     _normalize_functional(result, viewport, observations)
     _normalize_technical(result, viewport, observations)
@@ -1283,23 +1298,19 @@ def _score_dimension(
     configuration: ScoringConfiguration,
 ) -> dict[str, Any]:
     selected = [item for item in criteria if item["dimension"] == dimension.dimension_id]
+    applicable_items = [
+        item for item in selected
+        if dimension.implemented and item["implemented"]
+        and item["status"] != "not_applicable"
+    ]
     counts = {status: 0 for status in _all_statuses()}
     for criterion in selected:
         counts[criterion["status"]] += 1
-    applicable = sum(
-        counts[status]
-        for status in (
-            "pass",
-            "fail",
-            "needs_review",
-            "not_tested",
-            "error",
-        )
-    )
-    conclusive = counts["pass"] + counts["fail"]
+    applicable = len(applicable_items)
+    conclusive = sum(item["status"] in ("pass", "fail") for item in applicable_items)
     coverage = round(conclusive / applicable * 100, 2) if applicable else None
     score_denominator = sum(
-        item["weight"] for item in selected if item["status"] in ("pass", "fail")
+        item["weight"] for item in applicable_items if item["status"] in ("pass", "fail")
     )
     range_denominator = sum(
         item["weight"]
@@ -1307,22 +1318,22 @@ def _score_dimension(
         if dimension.implemented
         and item["implemented"]
         and item["status"]
-        in ("pass", "fail", "needs_review", "not_tested", "error")
+        in ("pass", "fail", "needs_review", "not_tested", "error", "unsupported")
     )
     passed_weight = sum(
-        item["weight"] for item in selected if item["status"] == "pass"
+        item["weight"] for item in applicable_items if item["status"] == "pass"
     )
     unresolved_weight = sum(
         item["weight"]
         for item in selected
         if item["implemented"]
-        and item["status"] in ("needs_review", "not_tested", "error")
+        and item["status"] in ("needs_review", "not_tested", "error", "unsupported")
     )
     raw_score = (
         round(
             sum(
                 item["weight"]
-                for item in selected
+                for item in applicable_items
                 if item["status"] == "pass"
             )
             / score_denominator
@@ -1338,11 +1349,7 @@ def _score_dimension(
         raw_score,
         configuration,
     )
-    score = raw_score if scoring_status not in (
-        "insufficient_evidence",
-        "not_implemented",
-        "not_scored",
-    ) else None
+    score = raw_score if dimension.implemented else None
     return {
         "dimension_id": dimension.dimension_id,
         "name": dimension.name,
@@ -1391,30 +1398,19 @@ def _score_overall(
     configuration: ScoringConfiguration,
 ) -> dict[str, Any]:
     implemented = [item for item in dimensions if item["implemented"]]
-    supported_with_coverage = [
-        item
-        for item in implemented
-        if item["coverage_percentage"] is not None
-    ]
-    coverage_denominator = sum(item["weight"] for item in supported_with_coverage)
+    # Coverage counts implemented applicable criteria, independently of score weights.
+    coverage_denominator = sum(item["total_applicable_criteria"] for item in implemented)
     overall_coverage = (
-        round(
-            sum(
-                item["weight"] * item["coverage_percentage"]
-                for item in supported_with_coverage
-            )
-            / coverage_denominator,
-            2,
-        )
-        if coverage_denominator
-        else None
+        round(sum(item["conclusive_criteria"] for item in implemented)
+              / coverage_denominator * 100, 2)
+        if coverage_denominator else None
     )
     included = [
         item
         for item in implemented
         if item["score"] is not None
         and item["coverage_percentage"] is not None
-        and item["coverage_percentage"] >= configuration.minimum_overall_coverage
+        and item["conclusive_criteria"] > 0
     ]
     included_ids = {item["dimension_id"] for item in included}
     excluded = [
@@ -1427,10 +1423,6 @@ def _score_overall(
                 if item["coverage_percentage"] is None
                 else "Dimension has no conclusive evidence."
                 if item["conclusive_criteria"] == 0
-                else "Dimension evidence is below the configured score-validity threshold."
-                if item["score"] is None
-                else "Dimension coverage is below the configured overall threshold."
-                if item["coverage_percentage"] < configuration.minimum_overall_coverage
                 else "Dimension was excluded by configuration."
             ),
         }
@@ -1438,21 +1430,27 @@ def _score_overall(
         if item["dimension_id"] not in included_ids
     ]
     denominator = sum(item["weight"] for item in included)
+    aggregation_valid = all(
+        math.isfinite(item["weight"]) and item["weight"] > 0
+        and math.isfinite(item["score"]) and 0 <= item["score"] <= 100
+        for item in included
+    ) and all(
+        math.isfinite(item["weight"]) and item["weight"] > 0
+        for item in criteria
+        if item["implemented"] and item["status"] in ("pass", "fail")
+    )
     candidate_score = (
         round(
             sum(item["weight"] * item["score"] for item in included) / denominator,
             2,
         )
-        if denominator
+        if denominator > 0 and aggregation_valid
         else None
     )
-    overall_score = (
-        candidate_score
-        if candidate_score is not None
-        and overall_coverage is not None
-        and overall_coverage >= configuration.minimum_overall_coverage
-        else None
-    )
+    overall_score = candidate_score if (
+        candidate_score is not None and math.isfinite(candidate_score)
+        and 0 <= candidate_score <= 100 and denominator > 0
+    ) else None
     all_dimensions_implemented = all(item["implemented"] for item in dimensions)
     overall_score_type = (
         "full_audit_score"
@@ -1478,9 +1476,7 @@ def _score_overall(
         "overall_coverage": overall_coverage,
         "minimum_overall_coverage": configuration.minimum_overall_coverage,
         "overall_scoring_status": overall_scoring_status,
-        "included_dimensions": [item["dimension_id"] for item in included]
-        if overall_score is not None
-        else [],
+        "included_dimensions": [item["dimension_id"] for item in included],
         "excluded_dimensions": excluded,
         "overall_score_label": (
             _threshold_label(overall_score, configuration.score_labels)
@@ -1516,7 +1512,7 @@ def _dimension_diagnostics(
         for item in selected
         if item["implemented"]
         and item["status"]
-        in ("pass", "fail", "needs_review", "not_tested", "error")
+        in ("pass", "fail", "needs_review", "not_tested", "error", "unsupported")
     ]
     conclusive = [
         item for item in applicable if item["status"] in ("pass", "fail")
@@ -1550,14 +1546,10 @@ def _score_unavailable(
     overall: dict[str, Any],
     configuration: ScoringConfiguration,
 ) -> dict[str, Any]:
-    threshold = configuration.minimum_overall_coverage
     reasons = []
     if overall["overall_coverage"] is None:
         reasons.append("Overall coverage could not be calculated from available evidence.")
-    elif overall["overall_coverage"] < threshold:
-        reasons.append(
-            f"Overall coverage is below the configured {threshold:g}% minimum."
-        )
+    reasons.append("No valid conclusive scoring evidence is available or aggregation is invalid.")
     if not included:
         reasons.append("No dimension currently meets the inclusion requirements.")
     dimension_details = []
@@ -1566,7 +1558,7 @@ def _score_unavailable(
             continue
         applicable_count = dimension["total_applicable_criteria"]
         conclusive_count = dimension["conclusive_criteria"]
-        required_count = math.ceil(threshold / 100 * applicable_count)
+        required_count = min(1, applicable_count)
         unresolved = [
             {
                 "criterion_id": criterion["criterion_id"],
@@ -1576,6 +1568,7 @@ def _score_unavailable(
                     "needs_review": "Existing evidence needs manual review.",
                     "not_tested": "Run the missing check.",
                     "error": "Resolve the analyzer or capture error.",
+                    "unsupported": "Run this implemented check in a supported environment.",
                 }[criterion["status"]],
                 "diagnostic": " ".join(criterion.get("limitations", []))[:500]
                 if criterion["status"] == "error"
@@ -1583,7 +1576,8 @@ def _score_unavailable(
             }
             for criterion in criteria
             if criterion["dimension"] == dimension["dimension_id"]
-            and criterion["status"] in ("needs_review", "not_tested", "error")
+            and criterion["implemented"]
+            and criterion["status"] in ("needs_review", "not_tested", "error", "unsupported")
         ]
         dimension_details.append(
             {

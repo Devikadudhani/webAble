@@ -347,7 +347,7 @@ def test_low_coverage_dimension_score_is_explicitly_based_on_conclusive_checks()
     assert dimension["score_basis"] == "conclusive_checks"
     assert dimension["coverage_percentage"] == 50
     assert dimension["score_range"] == {"min": 38.46, "max": 100.0}
-    assert dimension["scoring_status"] == "provisional"
+    assert dimension["scoring_status"] == "low_evidence"
 
 
 def test_scoring_debug_log_traces_criterion_and_dimension_calculations(caplog):
@@ -460,7 +460,7 @@ def test_missing_viewport_and_empty_scan_do_not_become_passes():
     assert _criterion(scoring, "accessibility.automated_checks")["status"] == "needs_review"
     assert scoring["overall_score"] is None
     assert scoring["overall_scoring_status"] == "insufficient_evidence"
-    assert scoring["minimum_overall_coverage"] == 30.0
+    assert scoring["minimum_overall_coverage"] == 70.0
 
 
 def test_distinct_scenario_evidence_is_not_collapsed():
@@ -542,8 +542,8 @@ def test_empty_scan_reports_viewport_gaps_and_score_unavailable_requirements():
         item for item in scoring["score_unavailable"]["dimensions"]
         if item["dimension_id"] == "accessibility"
     )
-    assert accessibility["required_conclusive_criteria"] == 3
-    assert accessibility["additional_conclusive_criteria_needed"] == 3
+    assert accessibility["required_conclusive_criteria"] == 1
+    assert accessibility["additional_conclusive_criteria_needed"] == 1
     assert accessibility["unresolved_criteria"]
     assert all(
         item["action"] == "Run the missing check."
@@ -561,7 +561,6 @@ def test_score_weight_basis_and_excluded_dimensions_use_dimension_ids():
         if item["implemented"]
         and item["score"] is not None
         and item["coverage_percentage"] is not None
-        and item["coverage_percentage"] >= scoring["minimum_overall_coverage"]
     ]
     implemented_weight = sum(
         item["weight"] for item in scoring["dimensions"] if item["implemented"]
@@ -632,7 +631,8 @@ def test_score_unavailable_actions_distinguish_review_not_tested_and_error():
         target_size_audit=TargetSizeAuditResult(status="unavailable"),
     )
     scoring = build_audit_scoring(
-        results, replace(DEFAULT_SCORING_CONFIGURATION, minimum_overall_coverage=99.0)
+        results, replace(DEFAULT_SCORING_CONFIGURATION,
+                         dimensions=(DEFAULT_SCORING_CONFIGURATION.dimensions[0],))
     )
     accessibility = next(
         item for item in scoring["score_unavailable"]["dimensions"]
@@ -658,10 +658,10 @@ def test_scoring_emits_wcag_metadata_evidence_strength_counts_and_version():
     assert keyboard["principle"] == "Operable"
     assert keyboard["evidence_strength"] == "bounded_probe"
     assert target_size["evidence_strength"] == "heuristic"
-    assert scoring["scoring_configuration_version"] == "1.3.0"
+    assert scoring["scoring_configuration_version"] == "1.4.1"
     assert sum(scoring["status_counts"].values()) == len(scoring["criteria"])
 
-    next_version = replace(DEFAULT_SCORING_CONFIGURATION, version="1.4.0")
+    next_version = replace(DEFAULT_SCORING_CONFIGURATION, version="test-next-version")
     rescored = build_audit_scoring(_results(), next_version)
     assert rescored["scoring_configuration_version"] != scoring["scoring_configuration_version"]
 
@@ -695,9 +695,215 @@ def test_overall_scoring_status_uses_configured_thresholds():
             "implemented": True,
             "score": 80.0,
             "coverage_percentage": 80.0,
+            "total_applicable_criteria": 5,
+            "conclusive_criteria": 4,
         }
     ]
 
     result = _score_overall(dimensions, [], configuration)
 
     assert result["overall_scoring_status"] == "valid_high_coverage"
+
+
+def test_optional_owner_context_never_changes_automated_scores_or_statuses():
+    from app.main import CaptureRequest, ResponsiveCaptureResponse
+    from app.analyzers.scoring import _NAME_RULES
+
+    results = _replace_all(
+        _results(),
+        accessibility_scan=AccessibilityScanResult(
+            status="available",
+            passes=[_axe_rule(rule_id) for rule_id in _NAME_RULES],
+            violations=[_axe_rule("color-contrast")],
+            incomplete=[_axe_rule("image-alt")],
+        ),
+    )
+    baseline = ResponsiveCaptureResponse.from_results("https://example.test/", results)
+    baseline_scoring = baseline.scoring.model_dump()
+    contexts = [{}, {"answers": [], "feature_presence": {"forms": None}}]
+    for answer in ("yes", "no", "not_sure", "not_applicable"):
+        contexts.append({
+            "feature_presence": {"forms": False, "custom_widgets": True},
+            "feature_inventory_completed": True,
+            "answers": [{"question_id": "forms.labels_and_instructions", "answer": answer}],
+        })
+    for context in contexts:
+        request = CaptureRequest.model_validate({
+            "url": "https://example.test/", "accessibility_context": context,
+        })
+        response = ResponsiveCaptureResponse.from_results(
+            request.url, results, request.accessibility_context,
+        )
+        assert response.scoring.model_dump() == baseline_scoring
+        for criterion in response.hybrid_evaluation["criteria"]:
+            assert criterion["compliance_conclusion"] is None
+            assert criterion["manual_review_required"]
+            assert all(not item["verified"] for item in criterion["owner_reported"])
+    assert _criterion(baseline_scoring, "accessibility.accessible_names")["status"] == "pass"
+    assert _criterion(baseline_scoring, "accessibility.color_contrast")["status"] == "fail"
+    assert _criterion(baseline_scoring, "accessibility.automated_checks")["status"] == "needs_review"
+
+
+def test_coverage_keeps_inconclusive_implemented_checks_and_excludes_future_checks():
+    scoring = build_audit_scoring(_results())
+    for dimension in scoring["dimensions"]:
+        applicable = [item for item in scoring["criteria"]
+                      if item["dimension"] == dimension["dimension_id"]
+                      and item["implemented"] and item["status"] != "not_applicable"]
+        conclusive = [item for item in applicable if item["status"] in ("pass", "fail")]
+        assert dimension["total_applicable_criteria"] == len(applicable)
+        assert dimension["coverage_percentage"] == (
+            round(len(conclusive) / len(applicable) * 100, 2) if applicable else None
+        )
+
+
+def _synthetic_scoring(statuses, configuration=DEFAULT_SCORING_CONFIGURATION):
+    from app.analyzers.scoring import _score_overall
+    criteria = [
+        {"criterion_id": c.criterion_id, "criterion_name": c.name,
+         "dimension": c.dimension, "weight": c.weight, "implemented": c.implemented,
+         "status": statuses.get(c.criterion_id, "needs_review") if c.implemented else "unsupported"}
+        for c in configuration.criteria
+    ]
+    dimensions = [_score_dimension(d, criteria, configuration) for d in configuration.dimensions]
+    return _score_overall(dimensions, criteria, configuration), dimensions
+
+
+def test_low_coverage_accessibility_failure_is_included_in_overall_aggregation():
+    statuses = {c.criterion_id: "pass" for c in DEFAULT_SCORING_CONFIGURATION.criteria
+                if c.dimension in ("responsive_quality", "functional_reliability")}
+    statuses["accessibility.color_contrast"] = "fail"
+    overall, dimensions = _synthetic_scoring(statuses)
+    accessibility = dimensions[0]
+    assert accessibility["score"] == 0
+    assert accessibility["coverage_percentage"] == 12.5
+    assert accessibility["scoring_status"] == "very_limited_evidence"
+    assert "accessibility" in overall["included_dimensions"]
+    assert overall["overall_score"] == 53.33
+    assert overall["overall_scoring_status"] == "low_evidence"
+    # Changing the quality threshold never changes the weighted score.
+    partial, _ = _synthetic_scoring(statuses, replace(DEFAULT_SCORING_CONFIGURATION, minimum_overall_coverage=0))
+    assert partial["overall_score"] == 53.33  # (35*0 + 25*100 + 15*100) / 75
+
+
+def test_fully_conclusive_passes_score_100_and_failures_reduce_original_weights():
+    statuses = {c.criterion_id: "pass" for c in DEFAULT_SCORING_CONFIGURATION.criteria}
+    passing, _ = _synthetic_scoring(statuses)
+    assert passing["overall_score"] == 100
+    assert passing["overall_coverage"] == 100
+    assert passing["overall_scoring_status"] == "valid_high_coverage"
+    statuses["accessibility.color_contrast"] = "fail"
+    failing, dimensions = _synthetic_scoring(statuses)
+    assert dimensions[0]["score"] == 87.5  # 28 / 32 original criterion weight
+    assert failing["overall_score"] == 95.14  # original dimension weights
+
+
+def test_inconclusive_checks_reduce_coverage_without_creating_failures():
+    statuses = {c.criterion_id: "pass" for c in DEFAULT_SCORING_CONFIGURATION.criteria}
+    for status in ("needs_review", "not_tested", "error", "unsupported"):
+        statuses["accessibility.color_contrast"] = status
+        overall, dimensions = _synthetic_scoring(statuses)
+        assert dimensions[0]["score"] == 100
+        assert dimensions[0]["coverage_percentage"] == 87.5
+        assert dimensions[0]["failed_criteria"] == 0
+        assert overall["overall_score"] == 100
+        assert overall["overall_coverage"] < 100
+
+
+def test_quality_threshold_does_not_gate_overall_score():
+    statuses = {c.criterion_id: "pass" for c in DEFAULT_SCORING_CONFIGURATION.criteria}
+    statuses["accessibility.color_contrast"] = "needs_review"
+    measured, _ = _synthetic_scoring(statuses)
+    threshold = measured["overall_coverage"]
+    available, _ = _synthetic_scoring(statuses, replace(DEFAULT_SCORING_CONFIGURATION, minimum_overall_coverage=threshold))
+    unavailable, _ = _synthetic_scoring(statuses, replace(DEFAULT_SCORING_CONFIGURATION, minimum_overall_coverage=threshold + .01))
+    assert available["overall_score"] == 100
+    assert unavailable["overall_score"] == available["overall_score"]
+    assert unavailable["overall_scoring_status"] == "valid_high_coverage"
+
+
+def test_axe_target_size_violation_is_not_lost_to_review_only_probe():
+    results = _replace_all(_results(), accessibility_scan=AccessibilityScanResult(
+        status="available", violations=[_axe_rule("target-size")]))
+    scoring = build_audit_scoring(results)
+    assert _criterion(scoring, "accessibility.target_size")["status"] == "fail"
+    assert "accessibility" in scoring["included_dimensions"]
+
+
+def test_overall_coverage_is_proportion_of_implemented_applicable_checks():
+    statuses = {"functional.broken_links": "pass", "accessibility.color_contrast": "fail"}
+    overall, dimensions = _synthetic_scoring(statuses)
+    applicable = sum(d["total_applicable_criteria"] for d in dimensions)
+    assert overall["overall_coverage"] == round(2 / applicable * 100, 2)
+
+
+def test_confirmed_partial_scan_displays_weighted_score_with_low_evidence_status():
+    # Reproduce the reported five passes, one failure, eleven unresolved checks.
+    statuses = {criterion: "pass" for criterion in (
+        "accessibility.accessible_names", "responsive.document_overflow",
+        "responsive.element_overflow", "functional.broken_links", "functional.broken_images",
+    )}
+    statuses["accessibility.color_contrast"] = "fail"
+    overall, dimensions = _synthetic_scoring(statuses)
+    assert sum(d["passed_criteria"] for d in dimensions) == 5
+    assert sum(d["failed_criteria"] for d in dimensions) == 1
+    assert sum(d["needs_review_criteria"] for d in dimensions) == 11
+    assert dimensions[0]["coverage_percentage"] == 25
+    assert dimensions[0]["score"] == 55.56
+    assert dimensions[1]["score"] == dimensions[2]["score"] == 100
+    assert overall["overall_coverage"] == 35.29
+    assert overall["overall_score"] == 79.26
+    assert overall["overall_scoring_status"] == "low_evidence"
+    assert "accessibility" in overall["included_dimensions"]
+
+
+def test_47_percent_coverage_keeps_five_failures_and_three_passes():
+    criteria = [c for c in DEFAULT_SCORING_CONFIGURATION.criteria if c.implemented]
+    statuses = {c.criterion_id: "fail" if i < 5 else "pass" for i, c in enumerate(criteria[:8])}
+    overall, dimensions = _synthetic_scoring(statuses)
+    assert overall["overall_coverage"] == 47.06
+    assert sum(d["failed_criteria"] for d in dimensions) == 5
+    assert sum(d["passed_criteria"] for d in dimensions) == 3
+    assert overall["overall_score"] == 31.25  # passing weight 10 / conclusive weight 32
+    assert overall["overall_scoring_status"] == "low_evidence"
+    assert "score_unavailable" not in overall
+
+
+def test_20_percent_coverage_and_failure_only_evidence_are_scored():
+    criteria = [c for c in DEFAULT_SCORING_CONFIGURATION.criteria if c.implemented]
+    statuses = {criteria[0].criterion_id: "fail", criteria[1].criterion_id: "pass",
+                criteria[2].criterion_id: "fail"}
+    statuses.update({c.criterion_id: "not_applicable" for c in criteria[-2:]})
+    overall, _ = _synthetic_scoring(statuses)
+    assert overall["overall_coverage"] == 20
+    assert overall["overall_score"] == 35.71  # 5 / 14, unchanged criterion weights
+    assert overall["overall_scoring_status"] == "very_limited_evidence"
+    failures_only, _ = _synthetic_scoring({criteria[0].criterion_id: "fail"})
+    assert failures_only["overall_score"] == 0
+    assert failures_only["overall_scoring_status"] == "very_limited_evidence"
+
+
+def test_blocked_website_cannot_score_challenge_page_evidence():
+    results = _replace_all(_results(), technical_evidence=TechnicalEvidenceResult(
+        status="available", access_status="restricted"),
+        accessibility_scan=AccessibilityScanResult(status="available", violations=[_axe_rule("color-contrast")]))
+    scoring = build_audit_scoring(results)
+    assert scoring["overall_score"] is None
+    assert scoring["overall_coverage"] == 0
+    assert all(d["score"] is None for d in scoring["dimensions"])
+
+
+def test_zero_conclusive_evidence_is_unavailable():
+    overall, _ = _synthetic_scoring({})
+    assert overall["overall_score"] is None
+    assert overall["overall_scoring_status"] == "insufficient_evidence"
+    assert "70%" not in overall["score_unavailable"]["reason"]
+
+
+def test_invalid_conclusive_weights_cannot_produce_overall_score():
+    for invalid_weight in (float("nan"), float("inf"), -1, 0):
+        criterion = replace(DEFAULT_SCORING_CONFIGURATION.criteria[0], weight=invalid_weight)
+        config = replace(DEFAULT_SCORING_CONFIGURATION,
+                         criteria=(criterion, *DEFAULT_SCORING_CONFIGURATION.criteria[1:]))
+        overall, _ = _synthetic_scoring({criterion.criterion_id: "fail", "functional.broken_links": "pass"}, config)
+        assert overall["overall_score"] is None

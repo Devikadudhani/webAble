@@ -316,6 +316,8 @@ def test_adaptive_frontend_preserves_answers_and_distinguishes_evidence():
             await mount_react(page)
             await page.wait_for_selector('input[name="feature-forms"]', state="attached")
 
+            # Exercise the preserved optional questionnaire while it is hidden in production.
+            await page.locator("#website-context").evaluate("element => element.hidden = false")
             await page.locator("#website-context > summary").click()
             assert await page.locator("#questions-panel").is_hidden()
             await page.locator(
@@ -471,6 +473,12 @@ def test_dashboard_filters_safe_evidence_partial_states_and_mobile_keyboard():
         ],
     }
 
+    for viewport in response["viewports"]:
+        viewport["keyboard_focus_audit"] = {"checks": [{
+            "check_id": "execution-only-error", "status": "error",
+            "summary": "Analyzer execution failed",
+        }]}
+
     async def run():
         async with async_playwright() as playwright:
             browser = await playwright.chromium.launch()
@@ -535,6 +543,17 @@ def test_dashboard_filters_safe_evidence_partial_states_and_mobile_keyboard():
             ) == "rgb(255, 255, 255)"
             await page.emulate_media(media="screen")
             assert "Score unavailable" in await page.locator("#summary-cards").inner_text()
+            assert (await page.locator("#summary-cards").inner_text()).count("Score unavailable") == 1
+            metrics = page.locator(".primary-metrics")
+            assert "Confirmed failures\n1" in await metrics.inner_text()
+            assert "Evidence coverage\n25%" in await metrics.inner_text()
+            assert "Automated checks evaluated\n1" in await metrics.inner_text()
+            assert "Execution errors are not accessibility violations" in await page.locator(".analyzer-note").inner_text()
+            priority = page.locator(".priority-issues")
+            await priority.locator("summary").first.click()
+            assert "#unsafe" in await priority.inner_text()
+            assert "Provide a programmatic label." in await priority.inner_text()
+
             deferred = page.locator(".not-evaluated")
             assert await deferred.count() == 2
             assert "Not currently evaluated" in await deferred.first.inner_text()
@@ -553,6 +572,7 @@ def test_dashboard_filters_safe_evidence_partial_states_and_mobile_keyboard():
             await page.get_by_role("tab", name="Issues", exact=True).focus()
             await page.keyboard.press("Enter")
             assert await page.locator("#view-issues").is_visible()
+            assert "Analyzer execution failed" not in await page.locator("#issue-list").inner_text()
             await page.get_by_label("Category").select_option("Accessibility")
             assert await page.locator("#issue-list > li").count() == 1
             assert "2 occurrence(s)" in await page.locator("#issue-list").inner_text()
@@ -613,4 +633,40 @@ def test_dashboard_filters_safe_evidence_partial_states_and_mobile_keyboard():
             assert not errors
             await browser.close()
 
+    asyncio.run(run())
+
+
+def test_hidden_questionnaire_failure_or_pending_request_does_not_block_audit():
+    async def run():
+        async with async_playwright() as playwright:
+            browser = await playwright.chromium.launch()
+            for mode in ("failed", "pending"):
+                page = await browser.new_page()
+                await page.add_init_script("""window.__payloads = [];
+                    window.fetch = async (url, options = {}) => {
+                        if (url === '/accessibility/questionnaire') {
+                            MODE;
+                        }
+                        if (url === '/captures/jobs') {
+                            window.__payloads.push(JSON.parse(options.body));
+                            return Response.json({job_id: 'independent'});
+                        }
+                        return Response.json({status: 'completed', result: {
+                            requested_url: 'https://example.test/', viewports: []
+                        }});
+                    };""".replace("MODE;", "throw new Error('Questionnaire unavailable');" if mode == "failed"
+                                  else "return new Promise(() => {});"))
+                await mount_react(page)
+                assert await page.locator("#website-context").is_hidden()
+                await page.locator("#audit-url").fill("https://example.test/")
+                assert await page.locator("#submit-button").is_enabled()
+                await page.locator("#submit-button").click()
+                await page.wait_for_selector("#results")
+                payloads = await page.evaluate("window.__payloads")
+                assert len(payloads) == 1
+                assert payloads[0]["accessibility_context"]["answers"] == []
+                assert payloads[0]["accessibility_context"]["feature_presence"] == {}
+                assert await page.locator("#form-error").count() == 0
+                await page.close()
+            await browser.close()
     asyncio.run(run())

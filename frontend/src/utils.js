@@ -1,6 +1,6 @@
 export const list = (value) => (Array.isArray(value) ? value : []);
 export const readable = (value) =>
-  String(value ?? "Unavailable").replaceAll("_", " ");
+  ({ valid_high_coverage: "High coverage", valid_moderate_coverage: "Provisional", provisional: "Provisional", low_evidence: "Low evidence", very_limited_evidence: "Very limited evidence", insufficient_evidence: "Score unavailable" }[value] || String(value ?? "Unavailable").replaceAll("_", " "));
 export const format = (value) =>
   typeof value === "number" && Number.isFinite(value)
     ? String(Math.round(value * 10) / 10)

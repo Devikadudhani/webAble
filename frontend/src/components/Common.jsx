@@ -7,7 +7,7 @@ export function Badge({ value, concept }) {
     ? "danger"
     : /^(pass|completed)$/.test(value)
       ? "positive"
-      : /review|partial|provisional|insufficient|concern|timeout/.test(
+      : /review|partial|provisional|insufficient|low_evidence|very_limited_evidence|concern|timeout/.test(
             value || "",
           )
         ? "warning"

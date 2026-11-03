@@ -1,37 +1,44 @@
+import { scorePresentation } from "../scoringPresentation.mjs";
 import React, { Suspense, lazy } from "react";
 import { ScoreRing, CoverageBar, Distribution } from "./Visualizations";
 import { Badge, Evidence, Paginated } from "./Common";
 import { format, implemented, list, readable } from "../utils";
+import { PriorityIssues } from "./Issues";
 const ReportAnalytics = lazy(() => import("./ReportAnalytics"));
 export function SummaryCards({ scoring }) {
-  const counts = scoring.status_counts;
+  const presentation = scorePresentation(scoring);
+  const counts = scoring.status_counts || (Array.isArray(scoring.criteria) ? Object.fromEntries(
+    [["passed", "pass"], ["failed", "fail"], ["needs_review", "needs_review"], ["error", "error"], ["unsupported", "unsupported"], ["not_tested", "not_tested"], ["not_applicable", "not_applicable"]]
+      .map(([key, status]) => [key, scoring.criteria.filter(c => c.status === status).length])
+  ) : null);
+  const evaluated = counts ? (counts.passed || 0) + (counts.failed || 0) : null;
   const criteria = Array.isArray(scoring.criteria) ? scoring.criteria : null;
   const statusCounts = counts
     ? [
         ["Passed", counts.passed || 0, "positive"],
-        ["Failed", counts.failed || 0, "danger"],
+        ["Confirmed failures", counts.failed || 0, "danger"],
         ["Needs review", counts.needs_review || 0, "warning"],
         ["Not tested", counts.not_tested || 0, "gray"],
-        ["Errors", counts.error || 0, "danger"],
+        ["Analyzer errors", counts.error || 0, "gray"],
         ["Unsupported", counts.unsupported || 0, "light"],
         ["Not applicable", counts.not_applicable || 0, "light"],
       ]
     : criteria
       ? [
           ["Passed", criteria.filter(c => c.status === "pass").length, "positive"],
-          ["Failed", criteria.filter(c => c.status === "fail").length, "danger"],
+          ["Confirmed failures", criteria.filter(c => c.status === "fail").length, "danger"],
           ["Needs review", criteria.filter(c => c.status === "needs_review").length, "warning"],
         ]
       : null;
-  const scoreUnavailableReason =
-    scoring.overall_score == null && scoring.overall_coverage != null &&
-    scoring.minimum_overall_coverage != null
-      ? `The overall score is withheld because evidence coverage is ${format(scoring.overall_coverage)}%, below the configured ${format(scoring.minimum_overall_coverage)}% minimum. The score is not treated as zero.`
-      : scoring.overall_score == null
-        ? "A score cannot be calculated from the conclusive evidence returned by this scan."
-        : "";
+  const scoreUnavailableReason = !presentation.available
+    ? "A score cannot be calculated: the scan was blocked, no valid conclusive evidence was returned, or the evidence is invalid." : "";
   return <div id="summary-cards" className="audit-summary" aria-label="Executive summary">
-    <section className="score-summary"><h3>WebAble score</h3><div className="score-layout"><ScoreRing value={scoring.overall_score} /><div><strong>{scoring.overall_score_label ? readable(scoring.overall_score_label) : "Evaluated checks"}</strong><p className="field-help">{readable(scoring.overall_scoring_status)}</p><p className="field-help">Evidence-based assessment, with human review.</p>{scoring.score_weight_basis && <p className="field-help">{scoring.overall_score == null ? "Eligible dimensions cover" : "Based on"} {format(scoring.score_weight_basis.percentage)}% of implemented audit weight ({format(scoring.score_weight_basis.included_weight)} of {format(scoring.score_weight_basis.implemented_weight)}).</p>}{scoreUnavailableReason && <p className="score-explanation" role="note">{scoring.score_unavailable?.reason || scoreUnavailableReason}</p>}</div></div>
+    <section className="primary-metrics" aria-label="Primary audit results">
+      <div className="failure-metric"><h3>Confirmed failures</h3><strong>{counts ? counts.failed || 0 : "Unavailable"}</strong><p className="field-help">Unique failed criteria · confirmed website issues</p></div>
+      <div className="coverage-summary"><CoverageBar value={scoring.overall_coverage} /><p className="field-help">Conclusive evidence within implemented automated checks</p></div>
+      <div><h3>Automated checks evaluated</h3><strong>{evaluated ?? "Unavailable"}</strong><p className="field-help">Unique criteria with a pass or fail result</p></div>
+    </section>
+    <section className="score-summary"><h3>Overall score</h3><div className="score-layout"><ScoreRing value={presentation.available ? scoring.overall_score : null} /><div><p className="score-coverage"><strong>{format(scoring.overall_coverage)}% evidence coverage</strong></p><strong>{presentation.available ? presentation.label : "More conclusive evidence needed"}</strong><p className="field-help">Automated audit evidence; human accessibility evaluation is not included.</p>{scoring.score_weight_basis && <p className="field-help">{scoring.overall_score == null ? "Eligible dimensions cover" : "Based on"} {format(scoring.score_weight_basis.percentage)}% of implemented audit weight ({format(scoring.score_weight_basis.included_weight)} of {format(scoring.score_weight_basis.implemented_weight)}).</p>}{scoreUnavailableReason && <p className="score-explanation" role="note">{scoring.score_unavailable?.reason || scoreUnavailableReason}</p>}</div></div>
       {list(scoring.score_unavailable?.dimensions).length > 0 && (
         <details className="score-gap-details">
           <summary>What evidence is still needed?</summary>
@@ -59,14 +66,14 @@ export function SummaryCards({ scoring }) {
             </section>
           ))}
           <p className="field-help">
-            Resolving these items does not guarantee an overall score; other
-            dimensions and the overall coverage threshold still apply.
+            Resolving these items does not guarantee an overall score;
+            valid conclusive evidence is required.
           </p>
         </details>
       )}
     </section>
     <section className="outcome-summary"><h3>Audit outcomes · unique criteria</h3>{statusCounts ? <Distribution label="Scoring criteria" segments={statusCounts} /> : <p className="field-help">Outcome counts unavailable</p>}</section>
-    <section className="coverage-summary"><CoverageBar value={scoring.overall_coverage} /><p className="field-help">Conclusive evidence available · distinct from score</p></section>
+    <p className="analyzer-note" role="note">Analyzer errors: {counts ? counts.error || 0 : "unavailable"}. Execution errors are not accessibility violations and do not count as evaluated checks. Coverage and scores are not WCAG conformance percentages.</p>
   </div>;
 }
 export function DimensionCard({ dimension: d }) {
@@ -88,15 +95,15 @@ export function DimensionCard({ dimension: d }) {
         </p>
       )}
       <dl className="technical-rows">
-        <div><dt>{d.score_basis === "conclusive_checks" ? "Score on conclusive checks" : "Score"}</dt><dd>{d.score == null ? "—" : `${format(d.score)} / 100`}</dd></div>
+        <div><dt>{d.score_basis === "conclusive_checks" ? "Score on conclusive checks" : "Score"}</dt><dd>{d.score == null ? "Score unavailable" : `${format(d.score)} / 100`}</dd></div>
         <div><dt>Coverage</dt><dd>{d.coverage_percentage == null ? "Unavailable" : `${format(d.coverage_percentage)}%`}</dd></div>
         <div><dt>Status</dt><dd><Badge value={d.scoring_status} /></dd></div>
         <div><dt>Passed</dt><dd>{d.passed_criteria ?? "—"}</dd></div>
-        <div><dt>Failed</dt><dd>{d.failed_criteria ?? "—"}</dd></div>
+        <div><dt>Confirmed failures</dt><dd>{d.failed_criteria ?? "—"}</dd></div>
         <div><dt>Review</dt><dd>{d.needs_review_criteria ?? "—"}</dd></div>
       </dl>
       {d.score_label && <p className="field-help">
-        {readable(d.score_label)}
+        {readable(d.scoring_status)} · {readable(d.score_label)}
         {d.coverage_percentage != null && d.coverage_percentage < 100
           ? " on conclusive checks only"
           : ""}
@@ -160,7 +167,7 @@ export function BrowserEvidence({ evaluation, viewports, catalog }) {
     </details>
   );
 }
-export default function Overview({ scoring, evaluation, viewports, catalog }) {
+export default function Overview({ scoring, evaluation, viewports, catalog, aiAnalysis, onShowScreenshot }) {
   const dimensions = list(scoring.dimensions),
     deferred = dimensions.filter((d) => !implemented(d));
   const counts = new Map();
@@ -168,6 +175,7 @@ export default function Overview({ scoring, evaluation, viewports, catalog }) {
     counts.set(c.status, (counts.get(c.status) || 0) + 1);
   return (
     <>
+      <PriorityIssues viewports={viewports} aiAnalysis={aiAnalysis} onShowScreenshot={onShowScreenshot} />
       <h3>Evaluation overview</h3>
       <Suspense fallback={<p className="field-help">Loading audit analytics…</p>}>
         <ReportAnalytics scoring={scoring} />

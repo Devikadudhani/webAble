@@ -291,7 +291,6 @@ export default function ResultsDashboard({
         aiRescanOptIn={aiRescanOptIn}
         setAiRescanOptIn={setAiRescanOptIn}
       />
-      <AIReportOverview analysis={response.ai_analysis} />
       <SummaryCards scoring={scoring} />
       {list(evaluation.conflicts).length > 0 && (
         <aside id="conflicts" className="conflicts">
@@ -328,6 +327,8 @@ export default function ResultsDashboard({
               evaluation={evaluation}
               viewports={viewports}
               catalog={catalog}
+              aiAnalysis={response.ai_analysis}
+              onShowScreenshot={showScreenshot}
             />
           ) : id === "issues" ? (
             <Issues
@@ -353,6 +354,7 @@ export default function ResultsDashboard({
           )}
         </section>
       ))}
+      <AIReportOverview analysis={response.ai_analysis} />
       <details className="panel">
         <summary>Audit limitations</summary>
         <Paginated

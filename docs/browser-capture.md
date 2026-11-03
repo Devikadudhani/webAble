@@ -565,7 +565,7 @@ do not cancel owner-reported concerns or create a reverse conflict, because a
 pass or incomplete outcome covers only the bounded rule/check performed.
 
 The capture response also exposes a top-level `scoring` summary. Its versioned
-registry is centralized in `app/analyzers/scoring.py`; version `1.2.0` includes
+registry is centralized in `app/analyzers/scoring.py`; version `1.4.1` includes
 criterion status, configured weight, evidence strength, WCAG references where
 direct mappings are defensible, per-viewport results, evidence references,
 confidence, and limitations. Status counts count each criterion once.
@@ -591,17 +591,45 @@ every page element; zero inspected text elements and truncated finding output
 are reported separately. A measured zero document overflow is conclusive;
 element-level geometry candidates remain review-only.
 
-Dimension scores use only conclusive `pass`/`fail` criteria, and are withheld
-when their evidence coverage is below the configured threshold. Their possible
-score ranges include unresolved criteria as possible outcomes; these ranges are
-not statistical confidence intervals. A dimension score is explicitly labeled
-as a score on conclusive checks and is accompanied by its evidence coverage,
-possible outcome range, and scoring status. The weighted overall score is reported
-as `partial_audit_score` while visual/UX quality is unsupported. It is withheld
-when overall coverage is below the configured minimum; `score_unavailable`
-describes current evidence gaps without promising that resolving them will
-produce a score. `score_weight_basis` reports what fraction of implemented audit
-weight contributes to the score. Scores from different
+Dimension performance is `100 * sum(passing criterion weights) /
+sum(conclusive passing and failing criterion weights)`. All existing criterion
+and dimension weights are unchanged. A dimension with conclusive evidence keeps
+its numeric performance even below 30% coverage, with `very_limited_evidence`
+status; 30–<70% is `low_evidence`, 70–<90% is `valid_moderate_coverage`, and
+90–100% is `valid_high_coverage`. The reporting labels are Very limited evidence,
+Low evidence, Provisional, and High coverage, respectively. No valid conclusive
+results means Score unavailable.
+Confirmed failures remain visible at every coverage level.
+
+Dimension coverage is `100 * conclusive criterion count / implemented applicable
+criterion count`. Overall coverage uses the same formula across all implemented
+dimensions. Inconclusive, missing, errored, and environment-unsupported checks
+remain in the denominator when their criterion is implemented. Unimplemented and
+not-applicable criteria are excluded. Missing evidence never becomes a pass or
+failure. Owner questionnaire answers do not enter either formula.
+
+Overall performance is `sum(dimension weight * dimension performance) /
+sum(dimension weights)` across **every** dimension with conclusive evidence,
+regardless of dimension coverage. Intermediate dimension scores and displayed
+coverage are rounded to two decimals; the overall score is rounded likewise.
+The headline score is available whenever at least one eligible conclusive result
+can be aggregated reliably. **70% overall coverage is a quality warning threshold**,
+not an eligibility gate. Coverage appears next to the score. Below 70%, the Overview,
+analytics, and PDF print view display: "Provisional score based on limited automated
+evidence. Unevaluated checks may change this result. This is not a WCAG conformance
+rating." The legacy `minimum_overall_coverage` response field records this quality
+boundary. Blocked challenge-page evidence is excluded; blocked scans, scans without
+valid conclusive evidence, and invalid aggregations have no overall score.
+Axe target-size violations contribute to the dedicated target-size criterion;
+geometric candidates alone remain review-only. Other axe violations retain their
+existing dedicated or general automated accessibility mappings.
+
+Possible score ranges include unresolved criteria as possible outcomes; they are
+not statistical confidence intervals. The overall score remains a
+`partial_audit_score` while visual/UX quality is unsupported. `score_unavailable`
+describes evidence gaps without guaranteeing a score. `score_weight_basis`
+reports the fraction of implemented dimension weight contributing to performance;
+it is separate from evidence coverage. Scores from different
 `scoring_configuration_version` values must not be joined into a score trend.
 The score and coverage labels are summaries of configured checks, not WCAG
 conformance, a severity ranking, or a measure of total website quality.

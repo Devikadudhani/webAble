@@ -2263,3 +2263,32 @@ footer {
     color:#333!important
   }
 }
+
+/* Primary audit evidence stays readable at presentation and mobile widths. */
+.primary-metrics {
+  grid-column:1/-1;
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:24px;
+  padding-bottom:24px;
+  margin-bottom:24px;
+  border-bottom:1px solid #333;
+}
+.primary-metrics > div { min-width:0; }
+.primary-metrics h3 { margin:0 0 12px; font-size:16px; }
+.primary-metrics strong { font-size:32px; line-height:1.2; }
+.primary-metrics .chart-heading { flex-wrap:wrap; }
+.primary-metrics .failure-metric > strong { color:#ff9b95; }
+.analyzer-note { grid-column:1/-1; color:#bdbdbd; margin:24px 0 0; font-size:13px; }
+.priority-issues { margin:24px 0; }
+.priority-issues summary { overflow-wrap:anywhere; }
+.priority-issues .issue-detail-content { margin-top:20px; }
+@media (max-width:700px) {
+  .primary-metrics { grid-template-columns:1fr; gap:20px; }
+}
+@media print {
+  .primary-metrics .failure-metric > strong,.analyzer-note { color:#111; }
+}
+
+.primary-metrics .coverage-summary { grid-column:auto; margin:0; padding:0; border:0; }
+

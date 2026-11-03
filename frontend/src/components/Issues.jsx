@@ -28,6 +28,10 @@ function aiGroupId(ruleId, category) {
   return `${String(ruleId).slice(0, 95)}:${categoryKey}`.slice(0, 160);
 }
 
+const executionError = finding => [finding.status, finding.result_status, finding.classification].some(
+  value => ["error", "execution_error", "analyzer_error"].includes(value),
+);
+
 function collectIssues(viewports) {
   const grouped = new Map();
   const add = (issue, viewport, evidence) => {
@@ -93,6 +97,7 @@ function collectIssues(viewports) {
             ? list(viewport.accessibility_scan?.non_text_contrast?.findings)
           : list(viewport[auditKey]?.findings);
       for (const finding of findings) {
+        if (executionError(finding)) continue;
         const selector =
           finding.selector ||
           finding.element_selector ||
@@ -141,6 +146,7 @@ function collectIssues(viewports) {
       }
       if (auditKey === "functional_ux_audit") {
         for (const finding of list(viewport.functional_ux_audit?.inconclusive)) {
+          if (executionError(finding)) continue;
           const selector = finding.element_selector || finding.rule_id;
           if (!selector) continue;
           add(
@@ -163,7 +169,7 @@ function collectIssues(viewports) {
     }
 
     for (const check of list(viewport.keyboard_focus_audit?.checks)) {
-      if (check.status === "pass") continue;
+      if (check.status === "pass" || executionError(check)) continue;
       add(
         {
           key: `keyboard:${check.check_id}`,
@@ -184,6 +190,7 @@ function collectIssues(viewports) {
 
     for (const scenario of list(viewport.text_reflow_audit?.scenarios)) {
       for (const finding of list(scenario.findings)) {
+        if (executionError(finding)) continue;
         const selector = finding.selector || finding.criterion_id;
         if (!selector) continue;
         add(
@@ -205,7 +212,11 @@ function collectIssues(viewports) {
       }
     }
   }
-  return [...grouped.values()];
+  const impact = { critical: 0, serious: 1, moderate: 2, minor: 3 };
+  return [...grouped.values()].sort((a, b) =>
+    Number(b.status === "fail") - Number(a.status === "fail") ||
+    (impact[a.impact] ?? 4) - (impact[b.impact] ?? 4)
+  );
 }
 
 function verificationStatus(issue, baseline, isFollowUp) {
@@ -418,6 +429,18 @@ function IssueDetails({ issue, aiAnalysis, onShowScreenshot }) {
       })}
     </div>
   );
+}
+
+export function PriorityIssues({ viewports, aiAnalysis, onShowScreenshot }) {
+  const issues = useMemo(() => collectIssues(viewports).filter(issue => issue.status === "fail").slice(0, 5), [viewports]);
+  return <section className="priority-issues" aria-labelledby="priority-issues-title">
+    <h3 id="priority-issues-title">Top actionable accessibility issues</h3>
+    <p className="field-help">Confirmed findings first, ordered by reported impact. Expand for evidence and available remediation. The Issues tab contains all findings and review items; finding counts may differ from unique failed criteria.</p>
+    {issues.length ? issues.map(issue => <details className="panel" key={issue.key}>
+      <summary>{issue.title} · {readable(issue.impact)} · {issue.occurrences.length} viewport(s)</summary>
+      <IssueDetails issue={issue} aiAnalysis={aiAnalysis} onShowScreenshot={onShowScreenshot} />
+    </details>) : <p className="field-help">No confirmed element-level findings were returned. Review criterion evidence in the WCAG tab.</p>}
+  </section>;
 }
 
 export default function Issues({

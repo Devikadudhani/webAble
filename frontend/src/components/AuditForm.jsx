@@ -40,7 +40,7 @@ export function OwnerQuestionnaire({
   const update = (id, key, value) =>
     setAnswers((old) => ({ ...old, [id]: { ...old[id], [key]: value } }));
   return (
-    <details id="website-context" className="context-disclosure">
+    <details id="website-context" className="context-disclosure" hidden>
       <summary>
         Add site context → <span>Optional</span>
       </summary>
@@ -222,7 +222,6 @@ export function AuditForm({
   form,
   setForm,
   loading,
-  ready,
   response,
   onSubmit,
   hidden = false,
@@ -266,7 +265,7 @@ export function AuditForm({
           </span>
         </label>
         <div className="url-actions">
-          <button id="submit-button" disabled={loading || !ready}>
+          <button id="submit-button" disabled={loading}>
             {loading
               ? "Auditing website…"
               : response

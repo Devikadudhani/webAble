@@ -53,7 +53,6 @@ export default function App() {
     [answers, setAnswers] = useState({}),
     [catalog, setCatalog] = useState([]),
     [questions, setQuestions] = useState([]),
-    [ready, setReady] = useState(false),
     [loading, setLoading] = useState(false),
     [response, setResponse] = useState(null),
     [error, setError] = useState(""),
@@ -107,10 +106,10 @@ export default function App() {
             list(q.features).map((x) => [x.feature_id, null]),
           ),
         }));
-        setReady(true);
       })
       .catch((e) => {
-        if (e.name !== "AbortError") setError(e.message);
+        // Optional owner context must never block or fail an automated audit.
+        if (e.name !== "AbortError") console.warn("Optional questionnaire unavailable", e);
       });
     return () => controller.abort();
   }, []);
@@ -184,7 +183,7 @@ export default function App() {
   }
   function submit(event) {
     event?.preventDefault();
-    if (pending.current || !ready) return;
+    if (pending.current) return;
     void startAudit(buildRequest(form, answers));
   }
   const onScanComplete = useCallback(
@@ -195,7 +194,7 @@ export default function App() {
   );
   const retryScan = useCallback(() => {
     if (job?.payload) void startAudit(job.payload);
-  }, [job, ready]);
+  }, [job]);
   function reset() {
     setForm({
       ...empty(),
@@ -239,7 +238,6 @@ export default function App() {
           setAnswers={setAnswers}
           catalog={catalog}
           questions={activeQuestions}
-          ready={ready}
           loading={loading}
           response={response}
           onSubmit={submit}

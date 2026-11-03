@@ -560,7 +560,7 @@ def test_capture_endpoint_returns_200_for_local_fixture(
         for viewport in response_body["viewports"]
     )
     scoring = response_body["scoring"]
-    assert scoring["scoring_configuration_version"] == "1.3.0"
+    assert scoring["scoring_configuration_version"] == "1.4.1"
     assert scoring["overall_score_type"] == "partial_audit_score"
     assert scoring["score_weight_basis"]["implemented_weight"] == 90
     assert set(scoring["status_counts"]) == {
