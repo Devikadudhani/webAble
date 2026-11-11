@@ -122,6 +122,11 @@ export function ScoringDimensionView({ scoring, dimensionId }) {
               <article className="panel">
                 <h4>{criterion.criterion_name}</h4>
                 <Badge value={criterion.status} />
+                {criterion.score_exclusion_reason && (
+                  <p className="field-help">
+                    Excluded from score: {criterion.score_exclusion_reason}
+                  </p>
+                )}
                 <p className="field-help">
                   Evidence strength · {readable(criterion.evidence_strength)} ·{" "}
                   {evidenceStrengthDescription(criterion.evidence_strength, criterion.status)}

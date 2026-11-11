@@ -113,7 +113,7 @@ export function DimensionCard({ dimension: d }) {
     </article>
   );
 }
-export function BrowserEvidence({ evaluation, viewports, catalog }) {
+export function BrowserEvidence({ evaluation, viewports }) {
   const features = viewports.flatMap((v) =>
     list(v.browser_feature_discovery?.features).filter((f) => f.detected),
   );
@@ -142,8 +142,7 @@ export function BrowserEvidence({ evaluation, viewports, catalog }) {
             {e.feature_id ? (
               <>
                 <p>
-                  {catalog.find((f) => f.feature_id === e.feature_id)?.label ||
-                    e.feature_id}
+                  {readable(e.feature_id)}
                   : {e.count ?? "Unknown"} candidate(s) on{" "}
                   {readable(e.viewport)}.
                 </p>
@@ -167,7 +166,7 @@ export function BrowserEvidence({ evaluation, viewports, catalog }) {
     </details>
   );
 }
-export default function Overview({ scoring, evaluation, viewports, catalog, aiAnalysis, onShowScreenshot }) {
+export default function Overview({ scoring, evaluation, viewports, aiAnalysis, onShowScreenshot }) {
   const dimensions = list(scoring.dimensions),
     deferred = dimensions.filter((d) => !implemented(d));
   const counts = new Map();
@@ -223,7 +222,6 @@ export default function Overview({ scoring, evaluation, viewports, catalog, aiAn
       <BrowserEvidence
         evaluation={evaluation}
         viewports={viewports}
-        catalog={catalog}
       />
     </>
   );

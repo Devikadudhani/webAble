@@ -3,6 +3,7 @@ import json
 import re
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 from playwright.async_api import async_playwright
 
@@ -158,6 +159,7 @@ def test_scan_route_resumes_after_refresh_and_report_route_restores_result():
     asyncio.run(run())
 
 
+@pytest.mark.skip(reason="Owner questionnaire UI is temporarily removed.")
 def test_adaptive_frontend_preserves_answers_and_distinguishes_evidence():
     questionnaire = {
         "version": "1.0",
@@ -384,6 +386,52 @@ def test_adaptive_frontend_preserves_answers_and_distinguishes_evidence():
             assert await page.get_by_text(
                 "Which sign-in methods are available?"
             ).is_visible()
+            await browser.close()
+
+    asyncio.run(run())
+
+
+def test_questionnaire_is_removed_and_bare_domains_are_normalized():
+    async def run():
+        async with async_playwright() as playwright:
+            browser = await playwright.chromium.launch()
+            page = await browser.new_page()
+            response = {
+                "requested_url": "https://example.com",
+                "viewports": [],
+                "scoring": {
+                    "overall_score": None,
+                    "overall_coverage": None,
+                    "dimensions": [],
+                    "criteria": [],
+                },
+                "hybrid_evaluation": {"criteria": []},
+            }
+            await page.add_init_script(
+                """((result) => {
+                window.__requests = [];
+                window.fetch = async (url, options = {}) => {
+                  if (url === "/captures/jobs") {
+                    window.__requests.push(JSON.parse(options.body));
+                    return Response.json({job_id: "bare-domain"});
+                  }
+                  if (url === "/captures/jobs/bare-domain") {
+                    return Response.json({status: "completed", result});
+                  }
+                  return Response.json({detail: "Unexpected request"}, {status: 404});
+                };
+                })(""" + json.dumps(response) + ");"
+            )
+            await mount_react(page)
+            assert await page.locator("#website-context").count() == 0
+            assert await page.locator("#questions-panel").count() == 0
+            await page.locator("#audit-url").fill("example.com")
+            await page.locator("#submit-button").click()
+            await page.wait_for_selector("#results:not([hidden])")
+            requests = await page.evaluate("window.__requests")
+            assert requests == [
+                {"url": "https://example.com", "ai_assistance_opt_in": False}
+            ]
             await browser.close()
 
     asyncio.run(run())
@@ -636,37 +684,30 @@ def test_dashboard_filters_safe_evidence_partial_states_and_mobile_keyboard():
     asyncio.run(run())
 
 
-def test_hidden_questionnaire_failure_or_pending_request_does_not_block_audit():
+def test_frontend_does_not_request_questionnaire():
     async def run():
         async with async_playwright() as playwright:
             browser = await playwright.chromium.launch()
-            for mode in ("failed", "pending"):
-                page = await browser.new_page()
-                await page.add_init_script("""window.__payloads = [];
-                    window.fetch = async (url, options = {}) => {
-                        if (url === '/accessibility/questionnaire') {
-                            MODE;
-                        }
-                        if (url === '/captures/jobs') {
-                            window.__payloads.push(JSON.parse(options.body));
-                            return Response.json({job_id: 'independent'});
-                        }
-                        return Response.json({status: 'completed', result: {
-                            requested_url: 'https://example.test/', viewports: []
-                        }});
-                    };""".replace("MODE;", "throw new Error('Questionnaire unavailable');" if mode == "failed"
-                                  else "return new Promise(() => {});"))
-                await mount_react(page)
-                assert await page.locator("#website-context").is_hidden()
-                await page.locator("#audit-url").fill("https://example.test/")
-                assert await page.locator("#submit-button").is_enabled()
-                await page.locator("#submit-button").click()
-                await page.wait_for_selector("#results")
-                payloads = await page.evaluate("window.__payloads")
-                assert len(payloads) == 1
-                assert payloads[0]["accessibility_context"]["answers"] == []
-                assert payloads[0]["accessibility_context"]["feature_presence"] == {}
-                assert await page.locator("#form-error").count() == 0
-                await page.close()
+            page = await browser.new_page()
+            await page.add_init_script("""window.__requests = [];
+                window.fetch = async (url, options = {}) => {
+                    window.__requests.push(url);
+                    if (url === '/captures/jobs') {
+                        return Response.json({job_id: 'independent'});
+                    }
+                    return Response.json({status: 'completed', result: {
+                        requested_url: 'https://example.test/', viewports: []
+                    }});
+                };""")
+            await mount_react(page)
+            assert await page.locator("#website-context").count() == 0
+            assert await page.locator("#questions-panel").count() == 0
+            await page.locator("#audit-url").fill("example.test")
+            await page.locator("#submit-button").click()
+            await page.wait_for_selector("#results")
+            assert "/accessibility/questionnaire" not in await page.evaluate(
+                "window.__requests"
+            )
+            await page.close()
             await browser.close()
     asyncio.run(run())

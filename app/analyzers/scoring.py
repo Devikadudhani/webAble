@@ -39,7 +39,7 @@ ScoringStatus = Literal[
     "not_scored",
 ]
 
-SCORING_CONFIGURATION_VERSION = "1.4.1"
+SCORING_CONFIGURATION_VERSION = "1.4.2"
 VIEWPORT_ORDER = ("desktop", "tablet", "mobile")
 
 _NAME_RULES = frozenset(
@@ -476,6 +476,9 @@ def build_audit_scoring(
         evidence = _merge_evidence(
             criterion.criterion_id, criterion_observations
         )
+        score_exclusion_reason = _manual_review_score_exclusion(
+            criterion.criterion_id, status
+        )
         tested_viewports = _ordered_unique(
             observation.viewport
             for observation in criterion_observations
@@ -498,6 +501,8 @@ def build_audit_scoring(
                 "dimension": criterion.dimension,
                 "implemented": criterion.implemented,
                 "status": status,
+                "score_eligible": criterion.implemented and score_exclusion_reason is None,
+                "score_exclusion_reason": score_exclusion_reason,
                 "weight": criterion.weight,
                 "evidence_strength": criterion.evidence_strength,
                 "wcag_references": list(criterion.wcag_references),
@@ -595,10 +600,21 @@ def build_audit_scoring(
             "Text resizing uses a deterministic computed-font-size override, not actual browser zoom.",
             "Keyboard traversal and visual candidate detection are bounded; partial probes do not establish full accessibility.",
             "Axe incomplete results, target-size candidates, overflow geometry, and other ambiguous evidence remain review-only.",
+            "WCAG checks that require human review are excluded from score coverage; their findings remain available for review.",
             "Severity and fix priority are not inferred from scores; source analyzer evidence is preserved without applying severity-based score penalties.",
             "Visual and UX quality is registered but unsupported and does not contribute to any score.",
         ],
     }
+
+
+def _manual_review_score_exclusion(
+    criterion_id: str, status: CriterionStatus
+) -> str | None:
+    if criterion_id == "accessibility.non_text_contrast":
+        return "Non-text contrast findings require human review."
+    if criterion_id == "accessibility.target_size" and status == "needs_review":
+        return "Potential target-size failures require human review."
+    return None
 
 
 def _normalize_viewport(
@@ -1301,6 +1317,7 @@ def _score_dimension(
     applicable_items = [
         item for item in selected
         if dimension.implemented and item["implemented"]
+        and item.get("score_eligible", True)
         and item["status"] != "not_applicable"
     ]
     counts = {status: 0 for status in _all_statuses()}
@@ -1317,6 +1334,7 @@ def _score_dimension(
         for item in selected
         if dimension.implemented
         and item["implemented"]
+        and item.get("score_eligible", True)
         and item["status"]
         in ("pass", "fail", "needs_review", "not_tested", "error", "unsupported")
     )
@@ -1327,6 +1345,7 @@ def _score_dimension(
         item["weight"]
         for item in selected
         if item["implemented"]
+        and item.get("score_eligible", True)
         and item["status"] in ("needs_review", "not_tested", "error", "unsupported")
     )
     raw_score = (

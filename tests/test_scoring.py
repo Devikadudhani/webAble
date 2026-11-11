@@ -658,7 +658,7 @@ def test_scoring_emits_wcag_metadata_evidence_strength_counts_and_version():
     assert keyboard["principle"] == "Operable"
     assert keyboard["evidence_strength"] == "bounded_probe"
     assert target_size["evidence_strength"] == "heuristic"
-    assert scoring["scoring_configuration_version"] == "1.4.1"
+    assert scoring["scoring_configuration_version"] == "1.4.2"
     assert sum(scoring["status_counts"].values()) == len(scoring["criteria"])
 
     next_version = replace(DEFAULT_SCORING_CONFIGURATION, version="test-next-version")
@@ -749,12 +749,49 @@ def test_coverage_keeps_inconclusive_implemented_checks_and_excludes_future_chec
     for dimension in scoring["dimensions"]:
         applicable = [item for item in scoring["criteria"]
                       if item["dimension"] == dimension["dimension_id"]
-                      and item["implemented"] and item["status"] != "not_applicable"]
+                      and item["implemented"] and item.get("score_eligible", True)
+                      and item["status"] != "not_applicable"]
         conclusive = [item for item in applicable if item["status"] in ("pass", "fail")]
         assert dimension["total_applicable_criteria"] == len(applicable)
         assert dimension["coverage_percentage"] == (
             round(len(conclusive) / len(applicable) * 100, 2) if applicable else None
         )
+
+
+def test_wcag_checks_requiring_manual_review_are_excluded_from_score_coverage():
+    candidate = TargetSizeFinding(
+        criterion_id="2.5.8",
+        selector="#small-target",
+        tag_name="button",
+        role="button",
+        accessible_name="Continue",
+        width_css_px=18,
+        height_css_px=18,
+        left_css_px=0,
+        top_css_px=0,
+    )
+    results = _replace_all(
+        _results(),
+        target_size_audit=TargetSizeAuditResult(
+            status="available", inspected_targets=1, findings=[candidate]
+        ),
+    )
+    scoring = build_audit_scoring(results)
+    non_text_contrast = _criterion(scoring, "accessibility.non_text_contrast")
+    target_size = _criterion(scoring, "accessibility.target_size")
+    accessibility = next(
+        item for item in scoring["dimensions"]
+        if item["dimension_id"] == "accessibility"
+    )
+
+    assert non_text_contrast["status"] == "needs_review"
+    assert non_text_contrast["score_eligible"] is False
+    assert target_size["status"] == "needs_review"
+    assert target_size["score_eligible"] is False
+    assert "human review" in non_text_contrast["score_exclusion_reason"]
+    assert "human review" in target_size["score_exclusion_reason"]
+    assert accessibility["total_applicable_criteria"] == 6
+    assert accessibility["needs_review_criteria"] >= 2
 
 
 def _synthetic_scoring(statuses, configuration=DEFAULT_SCORING_CONFIGURATION):

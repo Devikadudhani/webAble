@@ -588,6 +588,8 @@ class ScoringCriterionSchema(BaseModel):
     dimension: str
     status: str
     implemented: bool
+    score_eligible: bool
+    score_exclusion_reason: str | None
     weight: float
     evidence_strength: Literal["deterministic", "bounded_probe", "heuristic"]
     wcag_references: list[str]

@@ -5,42 +5,18 @@ export const format = (value) =>
   typeof value === "number" && Number.isFinite(value)
     ? String(Math.round(value * 10) / 10)
     : "Unavailable";
-export const lines = (value) =>
-  value
-    .split(/\r?\n/)
-    .map((v) => v.trim())
-    .filter(Boolean);
 export const implemented = (d) =>
   d.implemented !== false && d.scoring_status !== "not_implemented";
-export function buildRequest(form, answers) {
+export function normalizeWebsiteUrl(value) {
+  const url = value.trim();
+  return url && !/^[a-z][a-z\d+.-]*:\/\//i.test(url)
+    ? `https://${url.replace(/^\/\//, "")}`
+    : url;
+}
+export function buildRequest(form) {
   return {
-    url: form.url.trim(),
+    url: normalizeWebsiteUrl(form.url),
     ai_assistance_opt_in: Boolean(form.aiOptIn),
-    accessibility_context: {
-      representative_page_urls: lines(form.pages),
-      user_journeys: lines(form.journeys).map((line) => {
-        const [name = "", urls = ""] = line.split("|", 2);
-        return {
-          name: name.trim().slice(0, 120),
-          description: null,
-          page_urls: urls
-            .split(",")
-            .map((s) => s.trim())
-            .filter(Boolean),
-        };
-      }),
-      feature_presence: form.features,
-      feature_inventory_completed: form.complete,
-      answers: Object.entries(answers)
-        .filter(([, a]) => a.answer)
-        .map(([question_id, a]) => ({
-          question_id,
-          answer: a.answer,
-          explanation: a.explanation?.trim() || null,
-          page_urls: lines(a.pageUrls || ""),
-        })),
-      free_text: form.context.trim() || null,
-    },
   };
 }
 export function groupIssues(viewports, severity, viewport) {
