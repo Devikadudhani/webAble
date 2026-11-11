@@ -21,7 +21,7 @@ In another terminal:
 npm run dev
 ```
 
-Open http://127.0.0.1:5173/static/. Vite proxies `/accessibility` and `/captures` to FastAPI on port 8000. The backend API contracts and audit pipeline are unchanged.
+Open http://127.0.0.1:5173/static/. Vite proxies `/accessibility` and `/captures` to FastAPI on port 8000. Enter a public website URL with or without `https://`; WebAble adds HTTPS when omitted. The owner questionnaire is temporarily removed from the dashboard.
 
 ## Production
 
@@ -99,7 +99,12 @@ baseline image would not be valid evidence for that transformed state.
 The overall score is shown only when conclusive evidence reaches the
 configured minimum coverage (currently 40%). Lower coverage displays a reason
 instead of converting unavailable evidence into a zero score. Neither score
-nor coverage represents WCAG conformance.
+nor coverage represents WCAG conformance. WCAG findings that require human
+review remain in the report but are excluded from score coverage.
+
+WebAble scans public HTTP(S) pages that its browser can reach. It does not
+bypass authentication, CAPTCHA, bot protection, or network restrictions, and
+blocks requests to private/internal network destinations.
 
 ## Download a report
 
@@ -117,7 +122,7 @@ audit (and separately for each rescan) before grouped findings can be sent to
 Groq or eligible screenshot crops to Gemini. The service sends finding
 messages, up to three selectors per rule/category group, a short sanitized HTML sample,
 and only screenshots cropped around findings with measured element bounds.
-The requested page URL and owner questionnaire answers are not included as
+The requested page URL and owner context are not included as
 fields, though sanitized snippets may retain public host/path references. AI
 output is advisory and never changes analyzer findings, severity, scoring, or
 WCAG conclusions. The report includes a separate audit overview and structured
@@ -141,7 +146,7 @@ the report shows local rule-based fallback text.
 
 ```sh
 npm run build
-.venv/bin/python -m pytest tests/test_questionnaire_frontend.py
+.venv/bin/python -m pytest tests/test_questionnaire_frontend.py tests/test_scoring.py
 ```
 
 ## Test categories
@@ -172,4 +177,4 @@ External results use `passed`, `blocked_by_test_environment`,
 application failure. Render must be verified separately against its deployed
 service and logs; local results do not establish Render compatibility.
 
-Frontend sources live in `frontend/src`; generated assets live in `app/static`. The browser tests exercise the production build, adaptive questionnaire payloads, evidence safety, filters, keyboard tabs, mobile layout, partial data and unavailable dimensions. They use contract fixtures, never fallback results in the application. Backend and capture documentation remains in `docs/`.
+Frontend sources live in `frontend/src`; generated assets live in `app/static`. The browser tests exercise the production build, public URL entry, evidence safety, filters, keyboard tabs, mobile layout, partial data and unavailable dimensions. They use contract fixtures, never fallback results in the application. Backend and capture documentation remains in `docs/`.

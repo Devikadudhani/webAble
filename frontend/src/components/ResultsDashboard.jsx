@@ -224,7 +224,6 @@ export default function ResultsDashboard({
   visualBaseline,
   currentScanId,
   baselinePersisted,
-  catalog,
   onAgain,
   onNew,
 }) {
@@ -326,7 +325,6 @@ export default function ResultsDashboard({
               scoring={scoring}
               evaluation={evaluation}
               viewports={viewports}
-              catalog={catalog}
               aiAnalysis={response.ai_analysis}
               onShowScreenshot={showScreenshot}
             />

@@ -1,13 +1,9 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Header, AuditForm, AuditLoading } from "./components/AuditForm";
 import ResultsDashboard from "./components/ResultsDashboard";
 import ScanProgress from "./components/ScanProgress";
-import {
-  buildRequest,
-  getOrCreateVisualBaseline,
-  list,
-} from "./utils";
-import { createAuditJob, readApiResponse } from "./api.mjs";
+import { buildRequest, getOrCreateVisualBaseline } from "./utils";
+import { createAuditJob } from "./api.mjs";
 
 const SCAN_STORAGE_KEY = "webable.activeScan";
 function readSavedScan() {
@@ -39,20 +35,17 @@ function newScanId() {
 
 const empty = () => ({
   url: "",
-  pages: "",
-  journeys: "",
-  context: "",
   aiOptIn: false,
-  features: {},
-  complete: false,
 });
+function withoutOwnerContext(payload) {
+  const request = { ...payload };
+  delete request.accessibility_context;
+  return request;
+}
 export default function App() {
   const [path, setPath] = useState(window.location.pathname),
     [job, setJob] = useState(null);
   const [form, setForm] = useState(empty),
-    [answers, setAnswers] = useState({}),
-    [catalog, setCatalog] = useState([]),
-    [questions, setQuestions] = useState([]),
     [loading, setLoading] = useState(false),
     [response, setResponse] = useState(null),
     [error, setError] = useState(""),
@@ -74,17 +67,6 @@ export default function App() {
     setVisualBaseline(savedBaseline.baseline);
     setCurrentScanId(scanId);
     setBaselinePersisted(savedBaseline.persisted);
-    setQuestions((old) => [
-      ...new Map(
-        [
-          ...old,
-          ...list(result.hybrid_evaluation?.questions_to_ask).map((q) => ({
-            ...old.find((x) => x.question_id === q.question_id),
-            ...q,
-          })),
-        ].map((q) => [q.question_id, q]),
-      ).values(),
-    ]);
     setError(
       saved
         ? ""
@@ -93,26 +75,6 @@ export default function App() {
     navigate(`/report/${encodeURIComponent(scanId)}`);
   }, [navigate]);
 
-  useEffect(() => {
-    const controller = new AbortController();
-    fetch("/accessibility/questionnaire", { signal: controller.signal })
-      .then((r) => readApiResponse(r, "Loading the questionnaire"))
-      .then((q) => {
-        setCatalog(list(q.features));
-        setQuestions(list(q.conditional_questions));
-        setForm((f) => ({
-          ...f,
-          features: Object.fromEntries(
-            list(q.features).map((x) => [x.feature_id, null]),
-          ),
-        }));
-      })
-      .catch((e) => {
-        // Optional owner context must never block or fail an automated audit.
-        if (e.name !== "AbortError") console.warn("Optional questionnaire unavailable", e);
-      });
-    return () => controller.abort();
-  }, []);
   useEffect(() => {
     const onPopState = () => setPath(window.location.pathname);
     window.addEventListener("popstate", onPopState);
@@ -141,20 +103,6 @@ export default function App() {
       }
     }
   }, [path, navigate]);
-  const activeQuestions = useMemo(() => {
-    const detected = new Set(
-      list(response?.viewports).flatMap((v) =>
-        list(v.browser_feature_discovery?.features)
-          .filter((f) => f.detected)
-          .map((f) => f.feature_id),
-      ),
-    );
-    return questions.filter(
-      (q) =>
-        q.feature_id &&
-        (form.features[q.feature_id] === true || detected.has(q.feature_id)),
-    );
-  }, [questions, form.features, response]);
   async function startAudit(payload) {
     if (pending.current) return;
     pending.current = true;
@@ -184,7 +132,7 @@ export default function App() {
   function submit(event) {
     event?.preventDefault();
     if (pending.current) return;
-    void startAudit(buildRequest(form, answers));
+    void startAudit(buildRequest(form));
   }
   const onScanComplete = useCallback(
     (result) => {
@@ -193,14 +141,10 @@ export default function App() {
     [job, showReport],
   );
   const retryScan = useCallback(() => {
-    if (job?.payload) void startAudit(job.payload);
+    if (job?.payload) void startAudit(withoutOwnerContext(job.payload));
   }, [job]);
   function reset() {
-    setForm({
-      ...empty(),
-      features: Object.fromEntries(catalog.map((f) => [f.feature_id, null])),
-    });
-    setAnswers({});
+    setForm(empty());
     setResponse(null);
     setVisualBaseline(null);
     setCurrentScanId("");
@@ -234,10 +178,6 @@ export default function App() {
         <AuditForm
           form={form}
           setForm={setForm}
-          answers={answers}
-          setAnswers={setAnswers}
-          catalog={catalog}
-          questions={activeQuestions}
           loading={loading}
           response={response}
           onSubmit={submit}
@@ -294,10 +234,9 @@ export default function App() {
             visualBaseline={visualBaseline}
             currentScanId={currentScanId}
             baselinePersisted={baselinePersisted}
-            catalog={catalog}
             onAgain={(aiAssistanceOptIn) =>
               void startAudit({
-                ...(job?.payload || buildRequest(form, answers)),
+                ...withoutOwnerContext(job?.payload || buildRequest(form)),
                 ai_assistance_opt_in: aiAssistanceOptIn,
               })
             }
